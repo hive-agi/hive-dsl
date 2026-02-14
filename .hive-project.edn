@@ -1,0 +1,5 @@
+{:project-id "hive-dsl"
+ :parent "hive"
+ :description "Lightweight Result ADT and DSL macros for railway-oriented error handling"
+ :language :clojure
+ :tags ["dsl" "result" "adt" "error-handling"]}
