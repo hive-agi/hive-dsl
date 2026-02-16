@@ -94,12 +94,17 @@
        (err ~category {:message (.getMessage e#)
                        :class  (str (class e#))}))))
 
-;; --- rescue: best-effort fallback (replaces 780+ try-catch-log patterns) -----
+;; --- rescue / guard: Erlang-inspired two-tier error handling -----------------
+;;
+;; Erlang's `catch Expr`  → rescue  (supervision boundary, catches everything)
+;; Erlang's `try-catch`   → guard   (selective, catches specific class)
+;;
+;; Both return fallback with error info as metadata. No logging, no strings.
 
 (defmacro rescue
-  "Try body. On exception return fallback — error info as metadata (data, not strings).
-   Eliminates the ubiquitous (try expr (catch Exception e (log ...) fallback)) nesting.
-   Zero dependencies — error context attached via Clojure metadata, not logging.
+  "Supervision boundary — catch ANY throwable, return fallback.
+   Like Erlang's `catch Expr`: never let a failure propagate.
+   Error context attached via Clojure metadata, not logging.
 
    (rescue []  (traverse ids))        ;; => [] on failure, error in ^{::error {...}}
    (rescue nil (get-entry id))        ;; => nil on failure (nil can't carry meta)
@@ -108,7 +113,26 @@
    Error data shape: {::error {:message \"...\" :form \"(traverse ids)\"}}"
   [fallback & body]
   `(try ~@body
-        (catch Exception e#
+        (catch Throwable e#
+          (let [fb# ~fallback]
+            (if (instance? clojure.lang.IObj fb#)
+              (with-meta fb# {::error {:message (.getMessage e#)
+                                       :form    ~(str (first body))}})
+              fb#)))))
+
+(defmacro guard
+  "Selective catch — like rescue but for a specific Throwable subclass.
+   Like Erlang's `try ... catch Class:Reason`: structured error handling
+   where you care WHAT failed.
+
+   (guard Exception [] (risky-call))            ;; catch Exception only
+   (guard java.io.IOException nil (slurp path)) ;; catch IOException only
+   (guard AssertionError nil (validated-call x)) ;; catch :pre/:post failures
+
+   Error data shape: {::error {:message \"...\" :form \"(risky-call)\"}}"
+  [catch-class fallback & body]
+  `(try ~@body
+        (catch ~catch-class e#
           (let [fb# ~fallback]
             (if (instance? clojure.lang.IObj fb#)
               (with-meta fb# {::error {:message (.getMessage e#)
@@ -116,7 +140,7 @@
               fb#)))))
 
 (defn rescue-fn
-  "Wrap f: on exception return fallback (default nil). For keep/map pipelines.
+  "Wrap f: on throwable return fallback (default nil). For keep/map pipelines.
    Eliminates (keep (fn [x] (try (f x) (catch Exception _ nil))) coll).
 
    (keep (rescue-fn #(parse %)) items)           ;; nil on error → filtered by keep
@@ -125,4 +149,18 @@
   ([f fallback]
    (fn [& args]
      (try (apply f args)
-          (catch Exception _ fallback)))))
+          (catch Throwable _ fallback)))))
+
+(defn guard-fn
+  "Like rescue-fn but catches a specific class. For selective pipelines.
+
+   (keep (guard-fn Exception #(parse %)) items)
+   (map  (guard-fn IOException #(read %) :missing) items)"
+  ([catch-class f] (guard-fn catch-class f nil))
+  ([catch-class f fallback]
+   (fn [& args]
+     (try (apply f args)
+          (catch Throwable t
+            (if (instance? catch-class t)
+              fallback
+              (throw t)))))))
