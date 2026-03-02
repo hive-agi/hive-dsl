@@ -42,4 +42,13 @@
 
    ;; Transport / networking
    :transport/connection-refused :transport/timeout
-   :transport/protocol-error :transport/serialization-error})
+   :transport/protocol-error :transport/serialization-error
+
+   ;; Resource lifecycle
+   :resource/acquire-failed :resource/release-failed
+
+   ;; Transaction batching
+   :batch/flush-failed :batch/empty
+
+   ;; Scope cleanup
+   :scope/cleanup-error})
