@@ -139,6 +139,33 @@
                                        :form    ~(str (first body))}})
               fb#)))))
 
+(defn on-error
+  "Middleware: inspect rescue result, call handler-fn if error metadata present.
+   Composes with rescue — rescue captures, on-error reacts.
+
+   (on-error (fn [{:keys [message form]}] (log/error \"failed:\" message))
+             (rescue {} (risky-call)))
+
+   handler-fn receives: {:message \"...\" :form \"(risky-call)\"}
+   Returns the rescue result unchanged (transparent middleware)."
+  [handler-fn result]
+  (when-let [err (::error (meta result))]
+    (handler-fn err))
+  result)
+
+(defn with-error-handler
+  "HOF middleware: wrap a rescue-fn with an error callback.
+   Creates a composed fn that calls handler-fn on rescue failures.
+
+   (def safe-parse (with-error-handler
+                     (rescue-fn #(parse %) nil)
+                     (fn [{:keys [message]}] (log/warn \"parse failed:\" message))))
+   (safe-parse input)"
+  [rescue-wrapped-fn handler-fn]
+  (fn [& args]
+    (let [result (apply rescue-wrapped-fn args)]
+      (on-error handler-fn result))))
+
 (defn rescue-fn
   "Wrap f: on throwable return fallback (default nil). For keep/map pipelines.
    Eliminates (keep (fn [x] (try (f x) (catch Exception _ nil))) coll).
