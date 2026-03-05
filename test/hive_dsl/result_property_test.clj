@@ -78,6 +78,36 @@
                  f (gen-r/gen-result-fn r/ok r/err)]
                 (= (r/bind e f) e)))
 
+;; --- P8: ok-> single step with plain fn = map-ok ---
+
+(defspec p8-ok->-single-step-map-ok-equivalence 200
+  (prop/for-all [m (gen-r/gen-result r/ok r/err)
+                 f (gen-r/gen-plain-fn)]
+                (= (r/ok-> m f)
+                   (r/map-ok m f))))
+
+;; --- P9: ok-> short-circuit: err in = err out (no steps executed) ---
+
+(defspec p9-ok->-err-passthrough 200
+  (prop/for-all [e (gen-r/gen-err r/err)]
+                (= (r/ok-> e inc str)
+                   e)))
+
+;; --- P10: ok->> single step with plain fn = map-ok ---
+
+(defspec p10-ok->>-single-step-map-ok-equivalence 200
+  (prop/for-all [m (gen-r/gen-result r/ok r/err)
+                 f (gen-r/gen-plain-fn)]
+                (= (r/ok->> m f)
+                   (r/map-ok m f))))
+
+;; --- P11: ok->> short-circuit: err in = err out ---
+
+(defspec p11-ok->>-err-passthrough 200
+  (prop/for-all [e (gen-r/gen-err r/err)]
+                (= (r/ok->> e inc str)
+                   e)))
+
 ;; --- Additional: known-error? is total ---
 
 (defspec taxonomy-known-error-total 200

@@ -69,6 +69,51 @@
              (let-ok ~(vec rest-bindings) ~@body))
            r#)))))
 
+(defn ensure-result
+  "If x is already a Result (ok or err), return as-is. Otherwise wrap in ok.
+   Used by ok-> and ok->> for smart-wrapping step results."
+  [x]
+  (if (or (ok? x) (err? x))
+    x
+    (ok x)))
+
+(defmacro ok->
+  "Thread-first through Results with smart-wrap. Each step receives the
+   unwrapped :ok value. If a step returns a Result, use it directly (bind).
+   If it returns a plain value, auto-wrap in ok (fmap). Short-circuits on
+   first error.
+
+   Like some-> but with Result-based error info instead of nil.
+
+   (ok-> (validate-order order catalog)   ;; switch: may return err
+         price-order                       ;; pure: auto-wrapped in ok
+         (acknowledge create-letter)       ;; switch: may return err
+         log-order)                        ;; side-effect: auto-wrapped"
+  [expr & forms]
+  (let [g (gensym "ok__")
+        steps (map (fn [step] `(if (err? ~g) ~g
+                                   (ensure-result (-> (:ok ~g) ~step))))
+                   forms)]
+    `(let [~g (ensure-result ~expr)
+           ~@(interleave (repeat g) steps)]
+       ~g)))
+
+(defmacro ok->>
+  "Thread-last through Results with smart-wrap. Like ok-> but threads the
+   unwrapped value in last position.
+
+   (ok->> (ok [1 2 3 4])
+          (map inc)
+          (reduce +))"
+  [expr & forms]
+  (let [g (gensym "ok__")
+        steps (map (fn [step] `(if (err? ~g) ~g
+                                   (ensure-result (->> (:ok ~g) ~step))))
+                   forms)]
+    `(let [~g (ensure-result ~expr)
+           ~@(interleave (repeat g) steps)]
+       ~g)))
+
 (defmacro try-effect
   "Execute body in try/catch, returning ok on success or err on exception.
    Category defaults to :effect/exception.

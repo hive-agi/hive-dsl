@@ -88,6 +88,61 @@
                         c (r/ok 99)]
                        (r/ok (+ a b c))))))))
 
+;; --- ok-> ---
+
+(deftest ok->-test
+  (testing "ok-> threads through plain fns (auto-wrapped)"
+    (is (= (r/ok 4)
+           (r/ok-> (r/ok 1) inc inc inc))))
+  (testing "ok-> with args (thread-first position)"
+    (is (= (r/ok 3)
+           (r/ok-> (r/ok 1) (+ 2)))))
+  (testing "ok-> with switch fns returning Results"
+    (let [double-ok (fn [x] (r/ok (* 2 x)))]
+      (is (= (r/ok 10)
+             (r/ok-> (r/ok 5) double-ok)))))
+  (testing "ok-> short-circuits on error"
+    (let [called (atom false)
+          fail   (fn [_] (r/err :fail))
+          spy    (fn [x] (reset! called true) x)]
+      (is (= (r/err :fail)
+             (r/ok-> (r/ok 1) fail spy)))
+      (is (false? @called))))
+  (testing "ok-> wraps plain initial expression"
+    (is (= (r/ok 42)
+           (r/ok-> 42))))
+  (testing "ok-> with mix of plain and Result-returning steps"
+    (let [validate (fn [x] (if (pos? x) (r/ok x) (r/err :not-positive)))]
+      (is (= (r/ok 4)
+             (r/ok-> (r/ok 3) validate inc))))))
+
+;; --- ok->> ---
+
+(deftest ok->>-test
+  (testing "ok->> threads in last position"
+    (is (= (r/ok 14)
+           (r/ok->> (r/ok [1 2 3 4])
+                    (map inc)
+                    (reduce +)))))
+  (testing "ok->> short-circuits on error"
+    (let [called (atom false)
+          e      (r/err :fail)]
+      (is (= e
+             (r/ok->> e
+                      (map (fn [x] (reset! called true) x)))))
+      (is (false? @called))))
+  (testing "ok->> wraps plain initial expression"
+    (is (= (r/ok [1 2 3])
+           (r/ok->> [1 2 3]))))
+  (testing "ok->> with switch fn"
+    (let [safe-sum (fn [xs] (if (seq xs)
+                              (r/ok (reduce + xs))
+                              (r/err :empty-list)))]
+      (is (= (r/ok 6)
+             (r/ok->> (r/ok [1 2 3]) safe-sum)))
+      (is (= (r/err :empty-list)
+             (r/ok->> (r/ok []) safe-sum))))))
+
 ;; --- try-effect ---
 
 (deftest try-effect-test
