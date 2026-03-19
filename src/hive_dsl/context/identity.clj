@@ -41,6 +41,12 @@
             :project/global nil
             :project/scoped (:project-id project-scope)))
 
+(defn caller-id-key
+  "Derive session-scoped buffer key from caller only.
+   For piggyback channels where one session = one project."
+  [cid]
+  (caller-id-string cid))
+
 (defn make-buffer-key
   "Derive buffer key vector from caller + scope.
    Canonical key for ALL channel buffers."
