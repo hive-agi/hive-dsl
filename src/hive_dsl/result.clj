@@ -236,3 +236,79 @@
             (if (instance? catch-class t)
               fallback
               (throw t)))))))
+
+;; --- rescue-log / rescue-interrupt: logging and cancellation sugar ----------
+;;
+;; Base primitives alongside `rescue`/`guard`. They have direct try/catch
+;; in the expansion because that is the canonical definition of the
+;; sugar — callers then use `rescue-log` / `rescue-interrupt` INSTEAD of
+;; raw try/catch at their own call sites.
+;;
+;; `rescue` + manual `on-error` + log + error-map reshape is 6+ lines of
+;; boilerplate (see hive-knowledge.structural.core/ensure-require for the
+;; motivating pattern). These combinators compress it to one form.
+;;
+;; Dependency note: `clojure.tools.logging/warn` is resolved at runtime
+;; via `requiring-resolve` so hive-dsl itself does not hard-depend on
+;; c.t.l. If the logger is absent, logging is a silent no-op.
+
+(defn resolve-warn-fn
+  "Best-effort lookup of clojure.tools.logging/warn. Returns fn or nil.
+   Public because rescue-log/rescue-interrupt macros expand to call sites
+   that resolve this var in the caller's namespace."
+  []
+  (rescue nil (requiring-resolve 'clojure.tools.logging/warn)))
+
+(defmacro rescue-log
+  "Like `rescue`, but logs the exception via `clojure.tools.logging/warn`
+   under `label` before returning `fallback`. Combines rescue + log +
+   error-map reshape into one form. Replaces the common pattern of
+   `(try body (catch Exception e (log/warn e ...) fallback))`.
+
+   (rescue-log \"ensure-require\" nil (risky-op))
+   ;; => (risky-op) result on success, nil + warn-log on failure
+
+   (rescue-log \"parse-config\" {:error :config/parse-failed}
+     (edn/read-string (slurp path)))
+
+   `label` — short call-site identifier, appears in log output
+   `fallback` — returned on any throwable caught
+   Logger degrades silently when clojure.tools.logging is absent."
+  [label fallback & body]
+  `(try ~@body
+        (catch Throwable e#
+          (when-let [warn-fn# (resolve-warn-fn)]
+            (warn-fn# e# (str ~label " failed: " (.getMessage e#))))
+          (let [fb# ~fallback]
+            (if (instance? clojure.lang.IObj fb#)
+              (with-meta fb# {::error {:message (.getMessage e#)
+                                       :label   ~label
+                                       :form    ~(str (first body))}})
+              fb#)))))
+
+(defmacro rescue-interrupt
+  "Like `rescue-log`, but treats `InterruptedException` as a silent
+   cancellation signal: re-interrupts the current thread and returns
+   `fallback` WITHOUT logging. Other throwables fall through to
+   `rescue-log` semantics (log + fallback).
+
+   Use inside futures / worker tasks that run on a bounded pool and can
+   be cancelled by a deadline watchdog — cancellation is expected, not
+   an error, so the log would be noise.
+
+   (rescue-interrupt \"query-axioms-worker\" []
+     (query-scoped-entries store q))"
+  [label fallback & body]
+  `(try ~@body
+        (catch InterruptedException _#
+          (.interrupt (Thread/currentThread))
+          ~fallback)
+        (catch Throwable e#
+          (when-let [warn-fn# (resolve-warn-fn)]
+            (warn-fn# e# (str ~label " failed: " (.getMessage e#))))
+          (let [fb# ~fallback]
+            (if (instance? clojure.lang.IObj fb#)
+              (with-meta fb# {::error {:message (.getMessage e#)
+                                       :label   ~label
+                                       :form    ~(str (first body))}})
+              fb#)))))

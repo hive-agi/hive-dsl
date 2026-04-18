@@ -139,6 +139,21 @@
   :args (s/cat :category keyword?
                :body (s/+ any?)))
 
+;; rescue-log: rescue + clojure.tools.logging warn on failure.
+;; (rescue-log "label" fallback body...)
+(s/fdef r/rescue-log
+  :args (s/cat :label  string?
+               :fallback any?
+               :body (s/+ any?)))
+
+;; rescue-interrupt: rescue-log variant that treats InterruptedException as
+;; silent cancellation (re-interrupts, no log).
+;; (rescue-interrupt "label" fallback body...)
+(s/fdef r/rescue-interrupt
+  :args (s/cat :label  string?
+               :fallback any?
+               :body (s/+ any?)))
+
 ;; =============================================================================
 ;; Taxonomy Contracts
 ;; =============================================================================
