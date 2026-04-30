@@ -51,4 +51,12 @@
    :batch/flush-failed :batch/empty
 
    ;; Scope cleanup
-   :scope/cleanup-error})
+   :scope/cleanup-error
+
+   ;; Multi tool — IAddon-native batch DSL
+   :multi/missing-ops :multi/invalid-ops
+   :multi/missing-tool :multi/missing-command
+   :multi/cycle :multi/ref-not-found :multi/dep-failed
+   :multi/dsl-unknown-verb :multi/dsl-compile-error
+   :multi/budget-exhausted
+   :multi/registry-conflict :multi/registry-stale})
