@@ -4,3 +4,4 @@
 target/
 .nrepl-port
 local.deps.edn
+.clj-kondo/
