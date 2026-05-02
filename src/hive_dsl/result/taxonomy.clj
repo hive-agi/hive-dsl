@@ -59,4 +59,7 @@
    :multi/cycle :multi/ref-not-found :multi/dep-failed
    :multi/dsl-unknown-verb :multi/dsl-compile-error
    :multi/budget-exhausted
-   :multi/registry-conflict :multi/registry-stale})
+   :multi/registry-conflict :multi/registry-stale
+   ;; Multi plan/run persistence (PR5)
+   :multi/plan-not-found :multi/plan-malformed
+   :multi/plan-persist-failed :multi/plan-compile-failed})

@@ -88,6 +88,11 @@
                         c (r/ok 99)]
                        (r/ok (+ a b c))))))))
 
+;; Strict-binding semantics (non-Result throws) are covered by
+;; `hive-dsl.let-ok-strict-trifecta-test` — golden + property + mutation
+;; including a `swallow-throw` mutation that mimics the pre-2026-05-02
+;; silent behavior, so a future revert of the strict throw fails loudly.
+
 ;; --- ok-> ---
 
 (deftest ok->-test

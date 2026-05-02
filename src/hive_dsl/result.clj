@@ -58,16 +58,38 @@
 
    (let-ok [x (may-fail)
             y (use x)]
-     (ok (+ x y)))"
+     (ok (+ x y)))
+
+   Strict: every binding RHS MUST evaluate to a Result map (`{:ok ..}` or
+   `{:error ..}`). A non-Result value throws `ex-info` with category
+   `:result/non-result-binding` and the offending binding symbol + form.
+
+   Why strict: the loose pre-2026-05 form silently treated non-Result
+   values as terminators, returning them as the chain's final value
+   without executing the body. That semantic produced one of the worst
+   failure modes (silent no-ops, `relocate-update` 2026-05-02). For
+   pure transformations between Result-returning steps, exit `let-ok`
+   into a plain `let`, then re-enter."
   [bindings & body]
   (if (empty? bindings)
     `(do ~@body)
     (let [[sym expr & rest-bindings] bindings]
       `(let [r# ~expr]
-         (if (ok? r#)
-           (let [~sym (:ok r#)]
-             (let-ok ~(vec rest-bindings) ~@body))
-           r#)))))
+         (cond
+           (ok? r#)  (let [~sym (:ok r#)]
+                       (let-ok ~(vec rest-bindings) ~@body))
+           (err? r#) r#
+           :else
+           (throw (ex-info
+                    (str "let-ok binding `" '~sym
+                         "` produced a non-Result value. "
+                         "Wrap pure transformations in r/ok or move them "
+                         "outside let-ok.")
+                    {:category :result/non-result-binding
+                     :binding  '~sym
+                     :form     '~expr
+                     :type     (some-> r# class .getName)
+                     :value    r#})))))))
 
 (defn ensure-result
   "If x is already a Result (ok or err), return as-is. Otherwise wrap in ok.
