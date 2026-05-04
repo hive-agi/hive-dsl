@@ -93,6 +93,30 @@
 ;; including a `swallow-throw` mutation that mimics the pre-2026-05-02
 ;; silent behavior, so a future revert of the strict throw fails loudly.
 
+(deftest let-ok-let-sugar-test
+  (testing ":let binds plain values without Result coercion"
+    (is (= (r/ok 6)
+           (r/let-ok [a    (r/ok 1)
+                      :let [b 2 c (+ a b)]
+                      d    (r/ok 3)]
+                     (r/ok (+ a b c d))))))
+  (testing ":let still short-circuits on err in subsequent Result bindings"
+    (let [e (r/err :downstream)]
+      (is (= e
+             (r/let-ok [a    (r/ok 1)
+                        :let [b (inc a)]
+                        c    e]
+                       (r/ok (+ a b c)))))))
+  (testing ":let bindings see prior Result-bound values"
+    (is (= (r/ok 100)
+           (r/let-ok [x    (r/ok 10)
+                      :let [y (* x x)]]
+                     (r/ok y)))))
+  (testing ":let with non-vector bindings throws ex-info"
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                          #":let requires a vector"
+                          (macroexpand-1 '(hive-dsl.result/let-ok [:let foo] (r/ok :nope)))))))
+
 ;; --- ok-> ---
 
 (deftest ok->-test

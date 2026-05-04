@@ -60,19 +60,45 @@
             y (use x)]
      (ok (+ x y)))
 
-   Strict: every binding RHS MUST evaluate to a Result map (`{:ok ..}` or
-   `{:error ..}`). A non-Result value throws `ex-info` with category
-   `:result/non-result-binding` and the offending binding symbol + form.
+   Strict: every Result-bound RHS MUST evaluate to a Result map
+   (`{:ok ..}` or `{:error ..}`). A non-Result value throws `ex-info`
+   with category `:result/non-result-binding` and the offending binding
+   symbol + form.
 
-   Why strict: the loose pre-2026-05 form silently treated non-Result
-   values as terminators, returning them as the chain's final value
-   without executing the body. That semantic produced one of the worst
-   failure modes (silent no-ops, `relocate-update` 2026-05-02). For
-   pure transformations between Result-returning steps, exit `let-ok`
-   into a plain `let`, then re-enter."
+   Pure-binding escape hatch: use `:let [v expr ...]` to bind plain
+   (non-Result) values inline, mirroring re-frame's `let-fx` and Clojure's
+   `for`/`doseq` :let support. The :let form is a vector of plain
+   sym/expr pairs evaluated as a Clojure `let`. Useful when a pure
+   transformation sits between two Result-returning steps:
+
+     (let-ok [x  (may-fail)
+              :let [y (inc x)]
+              z  (use y)]
+       (ok (+ x y z)))
+
+   Why strict for Result bindings: the loose pre-2026-05 form silently
+   treated non-Result values as terminators, returning them as the
+   chain's final value without executing the body. That semantic
+   produced one of the worst failure modes (silent no-ops,
+   `relocate-update` 2026-05-02). The `:let` escape hatch keeps the
+   strictness guarantee for Result steps while removing the friction
+   of re-entering nested plain `let` forms for pure work."
   [bindings & body]
-  (if (empty? bindings)
+  (cond
+    (empty? bindings)
     `(do ~@body)
+
+    ;; Pure-binding escape: (let-ok [:let [a 1 b 2] x (op a b)] ...)
+    (= :let (first bindings))
+    (let [[_ let-bindings & rest-bindings] bindings]
+      (when-not (vector? let-bindings)
+        (throw (ex-info "let-ok :let requires a vector of bindings"
+                        {:category :result/let-ok-malformed-let
+                         :got      let-bindings})))
+      `(let ~let-bindings
+         (let-ok ~(vec rest-bindings) ~@body)))
+
+    :else
     (let [[sym expr & rest-bindings] bindings]
       `(let [r# ~expr]
          (cond
@@ -83,8 +109,8 @@
            (throw (ex-info
                     (str "let-ok binding `" '~sym
                          "` produced a non-Result value. "
-                         "Wrap pure transformations in r/ok or move them "
-                         "outside let-ok.")
+                         "Wrap pure transformations in r/ok, use :let for "
+                         "pure bindings, or move them outside let-ok.")
                     {:category :result/non-result-binding
                      :binding  '~sym
                      :form     '~expr
