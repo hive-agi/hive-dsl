@@ -2,7 +2,8 @@
   "Lightweight Result monad for railway-oriented error handling.
 
    ok  results: {:ok value}
-   err results: {:error category ...extra-data}")
+   err results: {:error category ...extra-data}"
+  #?(:cljs (:require-macros [hive-dsl.result])))
 
 (defn ok
   "Wrap a value in a success Result."
@@ -67,28 +68,12 @@
 
    Pure-binding escape hatch: use `:let [v expr ...]` to bind plain
    (non-Result) values inline, mirroring re-frame's `let-fx` and Clojure's
-   `for`/`doseq` :let support. The :let form is a vector of plain
-   sym/expr pairs evaluated as a Clojure `let`. Useful when a pure
-   transformation sits between two Result-returning steps:
-
-     (let-ok [x  (may-fail)
-              :let [y (inc x)]
-              z  (use y)]
-       (ok (+ x y z)))
-
-   Why strict for Result bindings: the loose pre-2026-05 form silently
-   treated non-Result values as terminators, returning them as the
-   chain's final value without executing the body. That semantic
-   produced one of the worst failure modes (silent no-ops,
-   `relocate-update` 2026-05-02). The `:let` escape hatch keeps the
-   strictness guarantee for Result steps while removing the friction
-   of re-entering nested plain `let` forms for pure work."
+   `for`/`doseq` :let support."
   [bindings & body]
   (cond
     (empty? bindings)
     `(do ~@body)
 
-    ;; Pure-binding escape: (let-ok [:let [a 1 b 2] x (op a b)] ...)
     (= :let (first bindings))
     (let [[_ let-bindings & rest-bindings] bindings]
       (when-not (vector? let-bindings)
@@ -99,12 +84,16 @@
          (let-ok ~(vec rest-bindings) ~@body)))
 
     :else
-    (let [[sym expr & rest-bindings] bindings]
-      `(let [r# ~expr]
+    (let [[sym expr & rest-bindings] bindings
+          r         (gensym "r")
+          type-expr (if (:ns &env)
+                      (list 'some-> r 'type 'pr-str)
+                      (list 'some-> r 'class '.getName))]
+      `(let [~r ~expr]
          (cond
-           (ok? r#)  (let [~sym (:ok r#)]
+           (ok? ~r)  (let [~sym (:ok ~r)]
                        (let-ok ~(vec rest-bindings) ~@body))
-           (err? r#) r#
+           (err? ~r) ~r
            :else
            (throw (ex-info
                     (str "let-ok binding `" '~sym
@@ -114,8 +103,8 @@
                     {:category :result/non-result-binding
                      :binding  '~sym
                      :form     '~expr
-                     :type     (some-> r# class .getName)
-                     :value    r#})))))))
+                     :type     ~type-expr
+                     :value    ~r})))))))
 
 (defn ensure-result
   "If x is already a Result (ok or err), return as-is. Otherwise wrap in ok.
@@ -169,11 +158,13 @@
    (try-effect (do-side-effect!))
    => (ok result) or (err :effect/exception {:message \"...\"})"
   [& body]
-  `(try
-     (ok (do ~@body))
-     (catch Exception e#
-       (err :effect/exception {:message (.getMessage e#)
-                               :class  (str (class e#))}))))
+  (let [e         (gensym "e")
+        catch-sym (if (:ns &env) :default 'Exception)]
+    `(try
+       (ok (do ~@body))
+       (catch ~catch-sym ~e
+         (err :effect/exception {:message (ex-message ~e)
+                                 :class  (str (type ~e))})))))
 
 (defmacro try-effect*
   "Like try-effect but with a custom error category.
@@ -181,11 +172,13 @@
    (try-effect* :io/read-failure (slurp path))
    => (ok content) or (err :io/read-failure {:message \"...\"})"
   [category & body]
-  `(try
-     (ok (do ~@body))
-     (catch Exception e#
-       (err ~category {:message (.getMessage e#)
-                       :class  (str (class e#))}))))
+  (let [e         (gensym "e")
+        catch-sym (if (:ns &env) :default 'Exception)]
+    `(try
+       (ok (do ~@body))
+       (catch ~catch-sym ~e
+         (err ~category {:message (ex-message ~e)
+                         :class  (str (type ~e))})))))
 
 ;; --- rescue / guard: Erlang-inspired two-tier error handling -----------------
 ;;
@@ -205,13 +198,20 @@
 
    Error data shape: {::error {:message \"...\" :form \"(traverse ids)\"}}"
   [fallback & body]
-  `(try ~@body
-        (catch Throwable e#
-          (let [fb# ~fallback]
-            (if (instance? clojure.lang.IObj fb#)
-              (with-meta fb# {::error {:message (.getMessage e#)
-                                       :form    ~(str (first body))}})
-              fb#)))))
+  (let [cljs?      (boolean (:ns &env))
+        e          (gensym "e")
+        fb         (gensym "fb")
+        catch-sym  (if cljs? :default 'Throwable)
+        meta-check (if cljs?
+                     (list 'satisfies? 'cljs.core/IWithMeta fb)
+                     (list 'instance? 'clojure.lang.IObj fb))]
+    `(try ~@body
+          (catch ~catch-sym ~e
+            (let [~fb ~fallback]
+              (if ~meta-check
+                (with-meta ~fb {::error {:message (ex-message ~e)
+                                         :form    ~(str (first body))}})
+                ~fb))))))
 
 (defmacro guard
   "Selective catch — like rescue but for a specific Throwable subclass.
@@ -224,13 +224,19 @@
 
    Error data shape: {::error {:message \"...\" :form \"(risky-call)\"}}"
   [catch-class fallback & body]
-  `(try ~@body
-        (catch ~catch-class e#
-          (let [fb# ~fallback]
-            (if (instance? clojure.lang.IObj fb#)
-              (with-meta fb# {::error {:message (.getMessage e#)
-                                       :form    ~(str (first body))}})
-              fb#)))))
+  (let [cljs?      (boolean (:ns &env))
+        e          (gensym "e")
+        fb         (gensym "fb")
+        meta-check (if cljs?
+                     (list 'satisfies? 'cljs.core/IWithMeta fb)
+                     (list 'instance? 'clojure.lang.IObj fb))]
+    `(try ~@body
+          (catch ~catch-class ~e
+            (let [~fb ~fallback]
+              (if ~meta-check
+                (with-meta ~fb {::error {:message (ex-message ~e)
+                                         :form    ~(str (first body))}})
+                ~fb))))))
 
 (defn on-error
   "Middleware: inspect rescue result, call handler-fn if error metadata present.
@@ -269,7 +275,7 @@
   ([f fallback]
    (fn [& args]
      (try (apply f args)
-          (catch Throwable _ fallback)))))
+          (catch #?(:clj Throwable :cljs :default) _ fallback)))))
 
 (defn guard-fn
   "Like rescue-fn but catches a specific class. For selective pipelines.
@@ -280,7 +286,7 @@
   ([catch-class f fallback]
    (fn [& args]
      (try (apply f args)
-          (catch Throwable t
+          (catch #?(:clj Throwable :cljs :default) t
             (if (instance? catch-class t)
               fallback
               (throw t)))))))
@@ -303,9 +309,11 @@
 (defn resolve-warn-fn
   "Best-effort lookup of clojure.tools.logging/warn. Returns fn or nil.
    Public because rescue-log/rescue-interrupt macros expand to call sites
-   that resolve this var in the caller's namespace."
+   that resolve this var in the caller's namespace. On cljs there is no
+   runtime var resolution; returns nil (logger degrades silently)."
   []
-  (rescue nil (requiring-resolve 'clojure.tools.logging/warn)))
+  #?(:clj  (rescue nil (requiring-resolve 'clojure.tools.logging/warn))
+     :cljs nil))
 
 (defmacro rescue-log
   "Like `rescue`, but logs the exception via `clojure.tools.logging/warn`
@@ -316,23 +324,28 @@
    (rescue-log \"ensure-require\" nil (risky-op))
    ;; => (risky-op) result on success, nil + warn-log on failure
 
-   (rescue-log \"parse-config\" {:error :config/parse-failed}
-     (edn/read-string (slurp path)))
-
    `label` — short call-site identifier, appears in log output
    `fallback` — returned on any throwable caught
-   Logger degrades silently when clojure.tools.logging is absent."
+   Logger degrades silently when clojure.tools.logging is absent (always on cljs)."
   [label fallback & body]
-  `(try ~@body
-        (catch Throwable e#
-          (when-let [warn-fn# (resolve-warn-fn)]
-            (warn-fn# e# (str ~label " failed: " (.getMessage e#))))
-          (let [fb# ~fallback]
-            (if (instance? clojure.lang.IObj fb#)
-              (with-meta fb# {::error {:message (.getMessage e#)
-                                       :label   ~label
-                                       :form    ~(str (first body))}})
-              fb#)))))
+  (let [cljs?      (boolean (:ns &env))
+        e          (gensym "e")
+        fb         (gensym "fb")
+        wf         (gensym "warn-fn")
+        catch-sym  (if cljs? :default 'Throwable)
+        meta-check (if cljs?
+                     (list 'satisfies? 'cljs.core/IWithMeta fb)
+                     (list 'instance? 'clojure.lang.IObj fb))]
+    `(try ~@body
+          (catch ~catch-sym ~e
+            (when-let [~wf (resolve-warn-fn)]
+              (~wf ~e (str ~label " failed: " (ex-message ~e))))
+            (let [~fb ~fallback]
+              (if ~meta-check
+                (with-meta ~fb {::error {:message (ex-message ~e)
+                                         :label   ~label
+                                         :form    ~(str (first body))}})
+                ~fb))))))
 
 (defmacro rescue-interrupt
   "Like `rescue-log`, but treats `InterruptedException` as a silent
@@ -340,23 +353,26 @@
    `fallback` WITHOUT logging. Other throwables fall through to
    `rescue-log` semantics (log + fallback).
 
-   Use inside futures / worker tasks that run on a bounded pool and can
-   be cancelled by a deadline watchdog — cancellation is expected, not
-   an error, so the log would be noise.
+   On cljs there is no thread interruption — degrades to `rescue-log`.
 
    (rescue-interrupt \"query-axioms-worker\" []
      (query-scoped-entries store q))"
   [label fallback & body]
-  `(try ~@body
-        (catch InterruptedException _#
-          (.interrupt (Thread/currentThread))
-          ~fallback)
-        (catch Throwable e#
-          (when-let [warn-fn# (resolve-warn-fn)]
-            (warn-fn# e# (str ~label " failed: " (.getMessage e#))))
-          (let [fb# ~fallback]
-            (if (instance? clojure.lang.IObj fb#)
-              (with-meta fb# {::error {:message (.getMessage e#)
-                                       :label   ~label
-                                       :form    ~(str (first body))}})
-              fb#)))))
+  (if (:ns &env)
+    `(rescue-log ~label ~fallback ~@body)
+    (let [e  (gensym "e")
+          fb (gensym "fb")
+          wf (gensym "warn-fn")]
+      `(try ~@body
+            (catch InterruptedException _#
+              (.interrupt (Thread/currentThread))
+              ~fallback)
+            (catch Throwable ~e
+              (when-let [~wf (resolve-warn-fn)]
+                (~wf ~e (str ~label " failed: " (ex-message ~e))))
+              (let [~fb ~fallback]
+                (if (instance? clojure.lang.IObj ~fb)
+                  (with-meta ~fb {::error {:message (ex-message ~e)
+                                           :label   ~label
+                                           :form    ~(str (first body))}})
+                  ~fb)))))))

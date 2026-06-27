@@ -39,7 +39,8 @@
        :event/started  (str (:task evt))
        :event/progress (str (:message evt)))"
   (:require [clojure.set :as set]
-            [clojure.string :as str]))
+            [clojure.string :as str])
+  #?(:cljs (:require-macros [hive-dsl.adt])))
 
 ;; =============================================================================
 ;; ADT Registry (parallel to result.taxonomy registry)
@@ -267,13 +268,7 @@
      (event-type :event/started {:task \"X\"})
      ;; => {:adt/type :EventType, :adt/variant :event/started, :task \"X\"}
 
-     (event-type :event/completed)
-     ;; => {:adt/type :EventType, :adt/variant :event/completed}
-
-     (event-type? x) ;; => true/false
-
-     (->event-type :event/started)
-     ;; => {:adt/type :EventType, :adt/variant :event/started}"
+     (event-type? x) ;; => true/false"
   {:arglists '([type-name docstring? & variants])}
   [type-name & body]
   (let [[docstring variants] (if (string? (first body))
@@ -286,24 +281,20 @@
                             {:type type-name})))
         variant-kws (mapv :variant parsed)
         variant-set (set variant-kws)
-        ;; Check for duplicate variants
         _ (when (not= (count variant-kws) (count variant-set))
             (let [dupes (into [] (comp (filter #(> (val %) 1)) (map key))
                               (frequencies variant-kws))]
               (throw (ex-info (str "Duplicate variants in defadt " type-name ": " dupes)
                               {:type type-name :duplicates dupes}))))
-        ;; Build schemas map — only for data-carrying variants
-        ;; Schemas contain symbols (like string?) that will be resolved at load time
         schemas-form (into {} (keep (fn [{:keys [variant schema]}]
                                       (when schema [variant schema]))
                                     parsed))
-        ;; Generate fn names: CamelCase → kebab-case
         kname (camel->kebab (name type-name))
         constructor-sym (symbol kname)
         pred-sym (symbol (str kname "?"))
         coerce-sym (symbol (str "->" kname))]
+    (register-type! type-kw {:variants variant-set :schemas schemas-form})
     `(do
-       ;; Type metadata var
        (def ~(vary-meta type-name assoc
                         :doc (or docstring (str "ADT type " type-kw))
                         :adt-type type-kw)
@@ -311,11 +302,9 @@
           :variants ~variant-set
           :schemas ~schemas-form})
 
-       ;; Register in global ADT registry
        (register-type! ~type-kw {:variants ~variant-set
                                  :schemas ~schemas-form})
 
-       ;; Constructor fn
        (defn ~constructor-sym
          ~(str "Construct a " (name type-name) " variant.\n"
                "  (" kname " variant-keyword) for enum variants\n"
@@ -336,13 +325,11 @@
                              :valid-variants ~variant-set})))
           (merge {:adt/type ~type-kw :adt/variant variant-kw#} data#)))
 
-       ;; Predicate fn
        (defn ~pred-sym
          ~(str "True if x is a " (name type-name) " ADT value.")
          [x#]
          (and (map? x#) (= (:adt/type x#) ~type-kw)))
 
-       ;; Keyword coercion fn
        (defn ~coerce-sym
          ~(str "Coerce a keyword to a " (name type-name) " variant (no data fields).\n"
                "  Returns nil if keyword is not a valid variant.")
@@ -350,7 +337,6 @@
          (when (contains? ~variant-set kw#)
            {:adt/type ~type-kw :adt/variant kw#}))
 
-       ;; Return the type keyword
        ~type-kw)))
 
 ;; =============================================================================
@@ -363,8 +349,9 @@
    Checks at macro-expansion time that all variants are covered — compile-time
    exhaustiveness checking. Uses `case` under the hood for O(1) dispatch.
 
-   type-ref must be a symbol that resolves to a defadt var (e.g. EventType).
-   expr is evaluated once and dispatched on (:adt/variant expr).
+   type-ref must be a symbol naming a defadt type (e.g. EventType), or a type
+   metadata map. The type's defadt namespace must be required so the type is
+   in the registry at macro-expansion time.
 
    (adt-case EventType evt
      :event/started   (str \"task: \" (:task evt))
@@ -380,11 +367,12 @@
                     {:type type-ref :clause-count (count clauses)})))
   (let [type-meta (cond
                     (symbol? type-ref)
-                    (if-let [v (resolve type-ref)]
-                      @v
-                      (throw (ex-info (str "Cannot resolve ADT type: " type-ref
-                                           ". Is the namespace required?")
-                                      {:type type-ref})))
+                    (let [type-kw (keyword (name type-ref))]
+                      (if-let [vs (type-variants type-kw)]
+                        {:type type-kw :variants vs}
+                        (throw (ex-info (str "Cannot resolve ADT type: " type-ref
+                                             ". Is its defadt namespace required?")
+                                        {:type type-ref}))))
 
                     (map? type-ref)
                     type-ref
