@@ -7,9 +7,13 @@
 
    Compose with hive-dsl.result/let-ok for railway-oriented pipelines.
 
-   Zero external dependencies — pure Clojure."
+   Zero external dependencies — pure Clojure.
+
+   ClojureScript: JVM number parsing (Long/Double) is replaced by strict
+   js/parseInt|parseFloat guards, and JSON parsing by js/JSON.parse — so the
+   ->int/->double/->vec semantics match across platforms."
   (:require [hive-dsl.result :as r]
-            [clojure.data.json :as json]
+            #?(:clj [clojure.data.json :as json])
             [clojure.string :as str]))
 
 ;; =============================================================================
@@ -27,12 +31,19 @@
   (cond
     (nil? v)     (r/ok nil)
     (integer? v) (r/ok (long v))
-    (string? v)  (try
-                   (r/ok (Long/parseLong v))
-                   (catch NumberFormatException _
-                     (r/err :coerce/invalid-int
-                            {:message (str "Expected integer, got \"" v "\"")
-                             :value v})))
+    (string? v)  #?(:clj
+                    (try
+                      (r/ok (Long/parseLong v))
+                      (catch NumberFormatException _
+                        (r/err :coerce/invalid-int
+                               {:message (str "Expected integer, got \"" v "\"")
+                                :value v})))
+                    :cljs
+                    (if (re-matches #"[+-]?\d+" v)
+                      (r/ok (js/parseInt v 10))
+                      (r/err :coerce/invalid-int
+                             {:message (str "Expected integer, got \"" v "\"")
+                              :value v})))
     (number? v)  (r/ok (long v))
     :else        (r/err :coerce/invalid-int
                         {:message (str "Expected integer, got " (type v) ": " (pr-str v))
@@ -49,12 +60,22 @@
     (nil? v)     (r/ok nil)
     (double? v)  (r/ok v)
     (number? v)  (r/ok (double v))
-    (string? v)  (try
-                   (r/ok (Double/parseDouble v))
-                   (catch NumberFormatException _
-                     (r/err :coerce/invalid-double
-                            {:message (str "Expected number, got \"" v "\"")
-                             :value v})))
+    (string? v)  #?(:clj
+                    (try
+                      (r/ok (Double/parseDouble v))
+                      (catch NumberFormatException _
+                        (r/err :coerce/invalid-double
+                               {:message (str "Expected number, got \"" v "\"")
+                                :value v})))
+                    :cljs
+                    (let [t (str/trim v)
+                          n (js/parseFloat t)]
+                      (if (and (not (js/isNaN n))
+                               (re-matches #"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?" t))
+                        (r/ok n)
+                        (r/err :coerce/invalid-double
+                               {:message (str "Expected number, got \"" v "\"")
+                                :value v}))))
     :else        (r/err :coerce/invalid-double
                         {:message (str "Expected number, got " (type v) ": " (pr-str v))
                          :value v})))
@@ -110,15 +131,16 @@
     (sequential? v) (r/ok (vec v))
     (string? v)     (if (str/starts-with? (str/trim v) "[")
                       (try
-                        (let [parsed (json/read-str v)]
+                        (let [parsed #?(:clj  (json/read-str v)
+                                        :cljs (js->clj (js/JSON.parse v)))]
                           (if (sequential? parsed)
                             (r/ok (vec parsed))
                             (r/err :coerce/invalid-vec
                                    {:message "JSON parsed to non-array"
                                     :value v})))
-                        (catch Exception e
+                        (catch #?(:clj Exception :cljs :default) e
                           (r/err :coerce/invalid-vec
-                                 {:message (str "Invalid JSON array: " (.getMessage e))
+                                 {:message (str "Invalid JSON array: " (ex-message e))
                                   :value v})))
                       (r/err :coerce/invalid-vec
                              {:message (str "Expected array, got string: \"" (subs v 0 (min 50 (count v))) "\"")
