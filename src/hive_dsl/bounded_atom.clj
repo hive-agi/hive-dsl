@@ -118,11 +118,49 @@
     ;; :ttl — no capacity-based eviction, only TTL (handled separately)
     []))
 
+(defn- ttl-scan-due?
+  "Cheap O(1) guard deciding whether the write path must run the full O(n)
+   TTL scan (evict-expired). Returns false — keeping writes O(1) amortized —
+   unless ttl-ms is set AND either:
+     - the map is over capacity (we will traverse for the capacity sort
+       anyway, so fold the TTL pass in), or
+     - the cached earliest-expiry (:next-expiry on the map metadata) is cold
+       (nil) or already due (now >= it), meaning some entry may have expired.
+   TTL entries that slip past this guard are still reclaimed off the write
+   path by bget (per-key, on read) and the periodic sweep!/sweep-all!."
+  [m max-entries ttl-ms]
+  (boolean
+   (and ttl-ms
+        (let [next-expiry (:next-expiry (meta m))]
+          (or (> (count m) max-entries)
+              (nil? next-expiry)
+              (>= (now-ms) (long next-expiry)))))))
+
+(defn- cache-next-expiry
+  "Recompute and cache the earliest entry-expiry (created-at + ttl-ms) on the
+   map's metadata under :next-expiry. O(n) — only invoked on the scan path, so
+   it stays off the O(1) hot write path. The cached value is a lower bound on
+   the true earliest expiry (inserts only add later-expiring entries, so it
+   never needs lowering between scans); a cold/stale cache merely costs an
+   extra scan, never a missed one."
+  [m ttl-ms]
+  (if (or (not ttl-ms) (empty? m))
+    (vary-meta m dissoc :next-expiry)
+    (let [earliest (reduce-kv (fn [acc _ entry] (min acc (long (:created-at entry))))
+                              Long/MAX_VALUE m)]
+      (vary-meta m assoc :next-expiry (+ earliest (long ttl-ms))))))
+
 (defn- enforce-capacity
   "Evict entries to bring map within max-entries. Returns [new-map evicted-count reason].
-   TTL eviction runs first, then capacity-based if still over limit."
+   Capacity is ALWAYS enforced (the over-count sort, guarded by actual overflow).
+   The O(n) TTL scan is SKIPPED on the write path unless ttl-scan-due? says an
+   entry may have expired — TTL expiry is otherwise reclaimed off the write path
+   by bget (per-key, on read) and the periodic sweep. When the scan does run it
+   also refreshes the cached :next-expiry so later writes can skip it again."
   [m {:keys [max-entries ttl-ms eviction-policy]}]
-  (let [[m1 ttl-evicted] (evict-expired m ttl-ms)
+  (let [scan? (ttl-scan-due? m max-entries ttl-ms)
+        [m0 ttl-evicted] (if scan? (evict-expired m ttl-ms) [m 0])
+        m1 (if scan? (cache-next-expiry m0 ttl-ms) m0)
         over-count (- (count m1) max-entries)]
     (if (<= over-count 0)
       [m1 ttl-evicted (when (pos? ttl-evicted) :ttl)]
