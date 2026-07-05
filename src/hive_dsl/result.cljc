@@ -180,6 +180,31 @@
          (err ~category {:message (ex-message ~e)
                          :class  (str (type ~e))})))))
 
+(defmacro try-effect-throwable*
+  "Like try-effect* but catches ANY Throwable (not just Exception) on the JVM.
+   Use ONLY at supervision boundaries where an Error must degrade to an err
+   Result instead of aborting — e.g. addon/manifest loading, where a
+   NoClassDefFoundError/LinkageError at `require` time or an AssertionError
+   from a `:pre`/`:post`/`assert`/slot `:validate` would otherwise skip every
+   later step. Returns the same ok/err shape as `try-effect*`, so `ok?`/`:ok`
+   work unchanged.
+
+   Contract: the caller MUST re-log the returned `:class`. Do NOT use this to
+   silently swallow a genuine OutOfMemoryError — inspect `:class` and re-raise
+   or surface fatal Errors rather than treating them as recoverable.
+
+   (try-effect-throwable* :addon/load-failed (require ns-sym))
+   => (ok result) or (err :addon/load-failed {:message \"...\" :class \"...\"})"
+  [category & body]
+  (let [e         (gensym "e")
+        ;; CLJS :default already catches everything; on the JVM widen to Throwable.
+        catch-sym (if (:ns &env) :default 'Throwable)]
+    `(try
+       (ok (do ~@body))
+       (catch ~catch-sym ~e
+         (err ~category {:message (ex-message ~e)
+                         :class  (str (type ~e))})))))
+
 ;; --- rescue / guard: Erlang-inspired two-tier error handling -----------------
 ;;
 ;; Erlang's `catch Expr`  → rescue  (supervision boundary, catches everything)
