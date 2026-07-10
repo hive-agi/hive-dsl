@@ -36,11 +36,15 @@
                           #(contains? % :ok)
                           #(not (contains? % :error))))
 
-;; Err result: map with :error key (value is a keyword category)
+;; Err result: map with :error key (value is a QUALIFIED-keyword category).
+;; MALLI-P4-D5: :error must satisfy ::error-category (qualified-keyword?), matching
+;; malli :hive/err and the taxonomy convention (:io/timeout, ...). Previously this
+;; accepted any keyword?, which was looser than ::error-category itself and than
+;; malli — the last spec<->malli divergence. Now converged.
 (s/def ::err-result (s/and map?
                            #(contains? % :error)
                            #(not (contains? % :ok))
-                           #(keyword? (:error %))))
+                           #(s/valid? ::error-category (:error %))))
 
 ;; The Result sum type: exactly one of Ok or Err
 ;; This is the Clojure equivalent of: type Result a e = Ok a | Err e
@@ -57,11 +61,14 @@
   :ret ::ok-result
   :fn #(= (-> % :ret :ok) (-> % :args :value)))
 
-;; err: keyword? -> ::err-result  (1-arity)
-;; err: keyword? map? -> ::err-result  (2-arity)
+;; err: ::error-category -> ::err-result  (1-arity)
+;; err: ::error-category map? -> ::err-result  (2-arity)
+;; MALLI-P4-D5: category is a QUALIFIED keyword (was keyword?), so the constructor
+;; contract matches the tightened ::err-result and cannot produce an err whose
+;; :ret would violate its own spec under instrumentation.
 (s/fdef r/err
-  :args (s/or :unary (s/cat :category keyword?)
-              :binary (s/cat :category keyword? :data map?))
+  :args (s/or :unary (s/cat :category ::error-category)
+              :binary (s/cat :category ::error-category :data map?))
   :ret ::err-result
   :fn #(= (-> % :ret :error) (-> % :args second :category)))
 

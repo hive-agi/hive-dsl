@@ -146,20 +146,24 @@
 (deftest spec-err-result-validity
   (testing "::err-result accepts err, rejects ok and invalid"
     (is (s/valid? ::rspec/err-result {:error :io/timeout}))
-    (is (s/valid? ::rspec/err-result {:error :x :message "boom"}))
+    (is (s/valid? ::rspec/err-result {:error :test/x :message "boom"}))
     (is (not (s/valid? ::rspec/err-result {:ok 42})))
-    (is (not (s/valid? ::rspec/err-result {:ok 1 :error :x})) "both keys = invalid")
+    (is (not (s/valid? ::rspec/err-result {:ok 1 :error :io/timeout})) "both keys = invalid")
     (is (not (s/valid? ::rspec/err-result {})))
-    (is (not (s/valid? ::rspec/err-result {:error "not-keyword"})))))
+    (is (not (s/valid? ::rspec/err-result {:error "not-keyword"})))
+    ;; MALLI-P4-D5: category must be QUALIFIED (was any keyword?) — converged with malli
+    (is (not (s/valid? ::rspec/err-result {:error :unqualified})) "unqualified keyword rejected")))
 
 (deftest spec-result-sum-type
   (testing "::result is exactly one of ok or err, never both, never neither"
     (is (s/valid? ::rspec/result {:ok 42}))
-    (is (s/valid? ::rspec/result {:error :x}))
-    (is (not (s/valid? ::rspec/result {:ok 1 :error :x})))
+    (is (s/valid? ::rspec/result {:error :io/timeout}))
+    (is (not (s/valid? ::rspec/result {:ok 1 :error :io/timeout})))
     (is (not (s/valid? ::rspec/result {})))
     (is (not (s/valid? ::rspec/result nil)))
-    (is (not (s/valid? ::rspec/result "not a map")))))
+    (is (not (s/valid? ::rspec/result "not a map")))
+    ;; MALLI-P4-D5: unqualified-keyword error is no longer a valid ::result
+    (is (not (s/valid? ::rspec/result {:error :unqualified})))))
 
 ;; =============================================================================
 ;; Section 4: Generator Conformance
