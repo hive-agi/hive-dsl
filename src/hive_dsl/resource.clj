@@ -66,16 +66,16 @@
   (atom []))
 
 (defn scope-acquire!
-  "Acquire a resource within a scope. Calls acquire-fn with args,
-   which must return a Result. On ok, pushes [resource cleanup-fn]
-   onto the scope stack and returns the Result. On err, returns the error.
+  "Acquire a resource within a scope. Applies acquire-fn to args (a vector),
+   which must return a Result. On ok, pushes [resource cleanup-fn] onto the
+   scope stack and returns the Result. On err, returns the error. cleanup-fn
+   defaults to identity.
 
    Usage:
-     (scope-acquire! scope open-db config)
-     ;; acquire-fn is (open-db config), must return Result
-     ;; cleanup-fn is (constantly nil) if not provided"
-  ([scope acquire-fn & args]
-   (scope-acquire! scope nil acquire-fn args))
+     (scope-acquire! scope open-db [config])
+     (scope-acquire! scope close-db! open-db [config])"
+  ([scope acquire-fn args]
+   (scope-acquire! scope identity acquire-fn args))
   ([scope cleanup-fn acquire-fn args]
    (let [result (apply acquire-fn args)]
      (if (r/ok? result)
