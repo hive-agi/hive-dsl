@@ -111,8 +111,13 @@
 ;; =============================================================================
 
 (defspec p5-lru-preserves-recent 200
-  (prop/for-all [max-entries (gen/choose 2 10)
-                 extra-values (gen/vector gen/any-printable 1 5)]
+  ;; Overflow strictly below capacity: a recently-accessed entry only survives
+  ;; churn until `max-entries` newer entries push it back to LRU. Beyond that,
+  ;; eviction of the protected key is correct LRU behaviour, not a violation.
+  (prop/for-all [[max-entries extra-values]
+                 (gen/let [m  (gen/choose 2 10)
+                           ev (gen/vector gen/any-printable 1 (dec m))]
+                   [m ev])]
     (let [batom (ba/bounded-atom {:max-entries max-entries
                                   :eviction-policy :lru})
           ;; Fill exactly to capacity with distinct keys

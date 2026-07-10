@@ -6,8 +6,7 @@
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :refer [defspec]]
             [hive-dsl.batch :as batch]
-            [hive-test.properties :as props]
-            [hive-test.generators.kg :as gen-kg]))
+            [hive-test.properties :as props]))
 
 ;; =============================================================================
 ;; Generators

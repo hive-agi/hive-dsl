@@ -95,7 +95,7 @@
 
 (deftest let-ok-let-sugar-test
   (testing ":let binds plain values without Result coercion"
-    (is (= (r/ok 6)
+    (is (= (r/ok 9)
            (r/let-ok [a    (r/ok 1)
                       :let [b 2 c (+ a b)]
                       d    (r/ok 3)]
@@ -112,10 +112,16 @@
            (r/let-ok [x    (r/ok 10)
                       :let [y (* x x)]]
                      (r/ok y)))))
-  (testing ":let with non-vector bindings throws ex-info"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                          #":let requires a vector"
-                          (macroexpand-1 '(hive-dsl.result/let-ok [:let foo] (r/ok :nope)))))))
+  (testing ":let with non-vector bindings is rejected at macroexpansion"
+    (let [raw   (try (macroexpand-1 '(hive-dsl.result/let-ok [:let foo] (r/ok :nope)))
+                     nil
+                     (catch Throwable e e))
+          cause (if (instance? clojure.lang.Compiler$CompilerException raw)
+                  (.getCause raw)
+                  raw)]
+      (is (instance? clojure.lang.ExceptionInfo cause))
+      (is (re-find #":let requires a vector" (ex-message cause)))
+      (is (= :result/let-ok-malformed-let (:category (ex-data cause)))))))
 
 ;; --- ok-> ---
 

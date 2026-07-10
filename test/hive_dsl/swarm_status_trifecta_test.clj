@@ -46,9 +46,9 @@
            :slave-status/zombie     :slave-status/zombie
            :slave-status/terminated :slave-status/terminated
            :wholly/foreign          nil}
-   :xf    identity
+   :xf    #(some-> % :adt/variant)
    :gen   (gen/one-of [gen-slave-status-kw gen-foreign-kw])
-   :pred  #(or (nil? %) (slave-status-kws %))
+   :pred  #(or (nil? %) (slave-status-kws (:adt/variant %)))
    :num-tests 200})
 
 (deftrifecta liveness-coerce
@@ -57,9 +57,9 @@
            :liveness/dead    :liveness/dead
            :liveness/unknown :liveness/unknown
            :liveness/garbage nil}
-   :xf    identity
+   :xf    #(some-> % :adt/variant)
    :gen   (gen/one-of [gen-liveness-kw gen-foreign-kw])
-   :pred  #(or (nil? %) (liveness-kws %))
+   :pred  #(or (nil? %) (liveness-kws (:adt/variant %)))
    :num-tests 200})
 
 ;; =============================================================================
@@ -70,14 +70,14 @@
   (prop/for-all [k (gen/one-of [gen-slave-status-kw gen-foreign-kw])]
                 (let [coerced (ss/->slave-status k)]
                   (cond
-                    (slave-status-kws k) (= k coerced)
+                    (slave-status-kws k) (= k (:adt/variant coerced))
                     :else                (nil? coerced)))))
 
 (defspec liveness-closed-set 200
   (prop/for-all [k (gen/one-of [gen-liveness-kw gen-foreign-kw])]
                 (let [coerced (ss/->liveness-signal k)]
                   (cond
-                    (liveness-kws k) (= k coerced)
+                    (liveness-kws k) (= k (:adt/variant coerced))
                     :else            (nil? coerced)))))
 
 ;; =============================================================================
@@ -86,15 +86,20 @@
 
 (deftest slave-status-variants-match-datascript
   (testing "ADT variant set equals datascript slave-statuses set"
-    (require 'hive-mcp.swarm.datascript.schema)
-    (let [ds-set    @(resolve 'hive-mcp.swarm.datascript.schema/slave-statuses)
-          ;; Datascript uses bare keywords (:idle, :working, ...), ADT uses
-          ;; namespaced variants (:slave-status/idle, ...). Compare on the
-          ;; bare-name suffix.
-          adt-bare  (into #{} (map (comp keyword name)) (adt/type-variants :SlaveStatus))]
-      (is (= ds-set adt-bare)
-          (str "ADT/datascript drift. Datascript: " ds-set
-               " ADT (bare): " adt-bare)))))
+    ;; hive-dsl is a foundation lib and must not hard-depend on hive-mcp; this
+    ;; cross-lib parity check only runs when hive-mcp is on the classpath.
+    (if-let [ds-set (try (require 'hive-mcp.swarm.datascript.schema)
+                         @(resolve 'hive-mcp.swarm.datascript.schema/slave-statuses)
+                         (catch Throwable _ nil))]
+      (let [;; Datascript uses bare keywords (:idle, :working, ...), ADT uses
+            ;; namespaced variants (:slave-status/idle, ...). Compare on the
+            ;; bare-name suffix.
+            adt-bare (into #{} (map (comp keyword name)) (adt/type-variants :SlaveStatus))]
+        (is (= ds-set adt-bare)
+            (str "ADT/datascript drift. Datascript: " ds-set
+                 " ADT (bare): " adt-bare)))
+      (println "SKIP slave-status-variants-match-datascript —"
+               "hive-mcp.swarm.datascript.schema not on classpath"))))
 
 ;; =============================================================================
 ;; Property: LifecycleEvent variants typed + exhaustive
