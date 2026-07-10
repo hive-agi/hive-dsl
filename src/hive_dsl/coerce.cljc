@@ -211,8 +211,8 @@
       (let [[field type-spec] (first remaining)
             v (get acc field)]
         (if (nil? v)
-          ;; Field not in params — skip
-          (recur (next remaining) acc)
+          ;; Field absent or explicitly nil — drop it so downstream defaults apply
+          (recur (next remaining) (dissoc acc field))
           ;; Coerce the field
           (let [result (coerce-field v type-spec)]
             (if (r/ok? result)
