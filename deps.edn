@@ -13,6 +13,10 @@
                       {:git/tag "v0.3.0" :git/sha "763e4bc"}}
          :main-opts ["-m" "cognitect.test-runner"]}
 
+  ;; Typed Clojure checker - dev-only, never in base :deps. Powers the gated
+  ;; rung-3 tests: clojure -M:test:typed
+  :typed {:extra-deps {org.typedclojure/typed.clj.checker {:mvn/version "1.4.0"}}}
+
   ;; Clojars publishing (see ../hive-build). version = the repo's VERSION file.
   :build
   {:deps {io.github.clojure/tools.build {:mvn/version "0.10.9"}
