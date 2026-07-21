@@ -1,0 +1,2 @@
+{:config-paths ["../resources/clj-kondo.exports/io.github.hive-agi/hive-dsl"]
+ :lint-as {typed.clojure/defalias clojure.core/def}}
