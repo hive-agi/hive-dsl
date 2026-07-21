@@ -10,7 +10,8 @@
                       io.github.cognitect-labs/test-runner
                       {:git/tag "v0.5.1" :git/sha "dfb30dd"}
                       io.github.hive-agi/hive-test
-                      {:mvn/version "0.3.6"}}
+                      {:mvn/version "0.3.6"}
+                      metosin/malli {:mvn/version "0.20.1"}}
          :main-opts ["-m" "cognitect.test-runner"]}
 
   ;; Typed Clojure checker - dev-only, never in base :deps. Powers the gated
