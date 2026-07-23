@@ -5,21 +5,29 @@
    can analyze bindings, body expressions, and detect errors."
   (:require [clj-kondo.hooks-api :as api]))
 
+(defn- leading-then-body
+  "A `let` binding each of `lead` to `_`, with `body` in tail position.
+   Analyzes every leading argument without placing it in a `do` statement
+   position."
+  [lead body]
+  (api/list-node
+   (list* (api/token-node 'let)
+          (api/vector-node (vec (mapcat (fn [a] [(api/token-node '_) a]) lead)))
+          body)))
+
 (defn guard
   "Hook for (guard catch-class fallback & body).
    Skips catch-class, analyzes fallback + body."
   [{:keys [node]}]
-  (let [[_catch-class & rest-args] (rest (:children node))]
-    {:node (api/list-node
-            (list* (api/token-node 'do) rest-args))}))
+  (let [[_catch-class fallback & body] (rest (:children node))]
+    {:node (leading-then-body [fallback] body)}))
 
 (defn rescue
   "Hook for (rescue fallback & body).
    Analyzes all args (fallback is an expression too)."
   [{:keys [node]}]
-  (let [args (rest (:children node))]
-    {:node (api/list-node
-            (list* (api/token-node 'do) args))}))
+  (let [[fallback & body] (rest (:children node))]
+    {:node (leading-then-body [fallback] body)}))
 
 (defn try-effect
   "Hook for (try-effect & body).
@@ -41,17 +49,15 @@
   "Hook for (rescue-log label fallback & body).
    Analyzes label + fallback + body as expressions."
   [{:keys [node]}]
-  (let [args (rest (:children node))]
-    {:node (api/list-node
-            (list* (api/token-node 'do) args))}))
+  (let [[label fallback & body] (rest (:children node))]
+    {:node (leading-then-body [label fallback] body)}))
 
 (defn rescue-interrupt
   "Hook for (rescue-interrupt label fallback & body).
    Same shape as rescue-log."
   [{:keys [node]}]
-  (let [args (rest (:children node))]
-    {:node (api/list-node
-            (list* (api/token-node 'do) args))}))
+  (let [[label fallback & body] (rest (:children node))]
+    {:node (leading-then-body [label fallback] body)}))
 
 (defn let-ok
   "Hook for (let-ok [sym expr ... :let [normal-bindings] ...] & body).
