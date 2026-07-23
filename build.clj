@@ -272,6 +272,7 @@
     (println "Skip: clj-kondo not on PATH — install it to sync lint configs.")
     (let [cp      (str/join java.io.File/pathSeparator
                             (:classpath-roots (b/create-basis {:project "deps.edn"
+                                                               :user :standard
                                                                :aliases aliases})))
           targets (or (seq paths) (lint-paths))]
       (b/process {:command-args ["clj-kondo" "--lint" cp
