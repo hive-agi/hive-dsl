@@ -39,9 +39,15 @@
   {:node (do-node (rest (:children node)))})
 
 (defn adt-case
-  "Hook for (adt-case type-ref expr & clauses)."
+  "Hook for (adt-case type-ref expr & clauses). Preserve type-ref as a real var
+   reference, then model variant/body pairs as case clauses."
   [{:keys [node]}]
-  {:node (do-node (rest (:children node)))})
+  (let [[_ type-ref expr & clauses] (:children node)]
+    {:node (api/list-node
+            [(api/token-node 'let)
+             (api/vector-node [(api/token-node '_) type-ref])
+             (api/list-node
+              (list* (api/token-node 'case) expr clauses))])}))
 
 (defn with-scope
   "Hook for (with-scope [scope-sym] & body) — binds scope-sym over body."
