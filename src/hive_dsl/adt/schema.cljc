@@ -22,14 +22,26 @@
                 (catch Throwable _ nil))
      :cljs nil))
 
+(def pred->schema
+  "Core predicate fn -> symbolic malli schema (generator-capable, EDN-safe).
+   Runtime counterpart of hive-dsl.adt/pred-sym->malli (which works on symbols
+   at macroexpansion time; this table keys the evaluated fns)."
+  {any? 'any? boolean? 'boolean? double? 'double? float? 'float?
+   fn? 'fn? int? 'int? integer? 'integer? keyword? 'keyword?
+   map? 'map? nat-int? 'nat-int? neg-int? 'neg-int? nil? 'nil?
+   number? 'number? pos-int? 'pos-int? seq? 'seq? sequential? 'sequential?
+   set? 'set? string? 'string? symbol? 'symbol? vector? 'vector?})
+
 (defn variant->map-schema
   "A malli :map schema for one variant: the :adt/type and :adt/variant tag keys
-   pinned to their values, plus each declared field required and typed [:fn pred]."
+   pinned to their values, plus each declared field required and typed. Known
+   core predicates are upgraded to their symbolic malli schemas (generator-
+   capable, EDN-safe); unknown predicates stay [:fn pred] (validate-only)."
   [type-kw variant field->pred]
   (into [:map
          [:adt/type [:= type-kw]]
          [:adt/variant [:= variant]]]
-        (map (fn [[field pred]] [field [:fn pred]]))
+        (map (fn [[field pred]] [field (get pred->schema pred [:fn pred])]))
         field->pred))
 
 (defn adt->malli

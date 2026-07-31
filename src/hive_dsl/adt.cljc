@@ -241,6 +241,36 @@
       (str/replace #"([A-Z]+)([A-Z][a-z])" "$1-$2")
       str/lower-case))
 
+(def pred-sym->malli
+  "Predicate symbol -> symbolic malli schema (generator-capable, EDN-safe)."
+  {'any? 'any? 'boolean? 'boolean? 'double? 'double? 'float? 'float?
+   'fn? 'fn? 'int? 'int? 'integer? 'integer? 'keyword? 'keyword?
+   'map? 'map? 'nat-int? 'nat-int? 'neg-int? 'neg-int? 'nil? 'nil?
+   'number? 'number? 'pos-int? 'pos-int? 'seq? 'seq? 'sequential? 'sequential?
+   'set? 'set? 'string? 'string? 'symbol? 'symbol? 'vector? 'vector?})
+
+(defn- pred-sym->schema
+  "Upgrade a declared field predicate to its symbolic malli schema when known;
+   otherwise keep it as [:fn pred-sym] (validate-only, no generator)."
+  [pred-sym]
+  (get pred-sym->malli pred-sym [:fn pred-sym]))
+
+(defn- variants->malli-form
+  "Build the ONE malli :multi schema form (dispatch :adt/variant) for PARSED
+   variant declarations, at macroexpansion time. Field predicates are upgraded
+   through pred-sym->schema, so the emitted var is generator-capable and
+   EDN-safe wherever the table covers the predicates."
+  [type-kw parsed]
+  (into [:multi {:dispatch :adt/variant}]
+        (map (fn [{:keys [variant schema]}]
+               [variant (into [:map
+                               [:adt/type [:= type-kw]]
+                               [:adt/variant [:= variant]]]
+                              (map (fn [[field pred-sym]]
+                                     [field (pred-sym->schema pred-sym)]))
+                              schema)]))
+        parsed))
+
 ;; =============================================================================
 ;; defadt Macro
 ;; =============================================================================
@@ -254,6 +284,10 @@
 
    Generates:
    - `TypeName` var with type metadata {:type :TypeName :variants #{...} :schemas {...}}
+   - `TypeNameMalli` var: ONE malli :multi schema (dispatch :adt/variant) for the
+     whole ADT. Known core predicate symbols are upgraded to symbolic malli
+     schemas at macroexpansion time, so the var is generator-capable and
+     EDN-safe out of the box; unknown predicates stay [:fn pred] (validate-only)
    - `type-name` constructor fn (kebab-case of TypeName)
    - `type-name?` predicate fn
    - `->type-name` keyword coercion fn (returns nil for invalid keywords)
@@ -268,7 +302,9 @@
      (event-type :event/started {:task \"X\"})
      ;; => {:adt/type :EventType, :adt/variant :event/started, :task \"X\"}
 
-     (event-type? x) ;; => true/false"
+     (event-type? x) ;; => true/false
+
+     EventTypeMalli ;; => [:multi {:dispatch :adt/variant} ...]"
   {:arglists '([type-name docstring? & variants])}
   [type-name & body]
   (let [[docstring variants] (if (string? (first body))
@@ -292,7 +328,8 @@
         kname (camel->kebab (name type-name))
         constructor-sym (symbol kname)
         pred-sym (symbol (str kname "?"))
-        coerce-sym (symbol (str "->" kname))]
+        coerce-sym (symbol (str "->" kname))
+        malli-sym (symbol (str (name type-name) "Malli"))]
     (register-type! type-kw {:variants variant-set :schemas schemas-form})
     `(do
        (def ~(vary-meta type-name assoc
@@ -301,6 +338,12 @@
          {:type ~type-kw
           :variants ~variant-set
           :schemas ~schemas-form})
+
+       (def ~malli-sym
+         ~(str "Malli :multi schema (dispatch :adt/variant) for " (name type-name)
+               " — generator-capable and EDN-safe wherever pred-sym->malli covers"
+               " the declared field predicates.")
+         '~(variants->malli-form type-kw parsed))
 
        (register-type! ~type-kw {:variants ~variant-set
                                  :schemas ~schemas-form})

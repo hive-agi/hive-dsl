@@ -3,7 +3,9 @@
    an ADT value through it (backed by malli when present)."
   (:require [clojure.test :refer [deftest is testing]]
             [hive-dsl.adt :as adt]
-            [hive-dsl.adt.schema :as as]))
+            [hive-dsl.adt.schema :as as]
+            [malli.core :as m]
+            [malli.generator :as mg]))
 
 (adt/defadt DemoAdt "test ADT"
   [:event/started  {:task string?}]
@@ -29,3 +31,22 @@
       (is (some? (:explanation e)))))
   (testing "an enum variant validates on its tag keys alone"
     (is (map? (as/validate-malli DemoAdt (demo-adt :event/done))))))
+
+(deftest defadt-malli-var-is-gen-safe-and-edn-safe
+  (testing "defadt emits a TypeNameMalli :multi schema"
+    (is (= :multi (first DemoAdtMalli)))
+    (is (= {:dispatch :adt/variant} (second DemoAdtMalli))))
+  (testing "it validates ADT values"
+    (is (m/validate DemoAdtMalli (demo-adt :event/started {:task "x"})))
+    (is (not (m/validate DemoAdtMalli (demo-adt :event/started {:task 42}))))
+    (is (not (m/validate DemoAdtMalli {:adt/type :DemoAdt :adt/variant :event/bogus}))))
+  (testing "it is EDN-safe (no #object literals)"
+    (is (= DemoAdtMalli (read-string (pr-str DemoAdtMalli)))))
+  (testing "it generates valid ADT values"
+    (doseq [v (mg/sample DemoAdtMalli {:seed 42})]
+      (is (m/validate DemoAdtMalli v))))
+  (testing "runtime adt->malli is upgraded the same way"
+    (let [s (as/adt->malli DemoAdt)]
+      (is (= s (read-string (pr-str s))))
+      (doseq [v (mg/sample s {:seed 7})]
+        (is (m/validate s v))))))
