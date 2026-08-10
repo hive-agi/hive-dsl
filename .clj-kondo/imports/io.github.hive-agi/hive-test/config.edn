@@ -22,7 +22,8 @@
            hive-test.properties/defprop-complement        clojure.test/deftest
            hive-test.properties/defprop-fsm-terminates    clojure.test/deftest
            hive-test.linearizability/defprop-concurrent-safe  clojure.test/deftest
-           hive-test.linearizability/defprop-sequential-equiv clojure.test/deftest}
+           hive-test.linearizability/defprop-sequential-equiv clojure.test/deftest
+           clojure.test.check.clojure-test/defspec clojure.test/deftest}
 
  :hooks
  {:analyze-call
