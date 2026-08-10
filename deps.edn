@@ -21,4 +21,12 @@
   ;; Clojars publishing (see ../hive-build). version = the repo's VERSION file.
   :build
   {:deps {io.github.hive-agi/hive-build {:mvn/version "0.1.0"}}
-   :ns-default hive-build.api}}}
+   :ns-default hive-build.api}
+
+  ;; The host-free subset: clojure and nothing else. A namespace that loads
+  ;; under -M:portable needs no third-party dep and no host beyond the reader,
+  ;; which is the admission criterion for the JVM + cljw + cljrs target set.
+  ;; hive-dsl.coerce is the one known exclusion until its JSON reader becomes
+  ;; a port; lifecycle/gate/managed-channel/bounded-atom are JVM by design.
+  :portable {:replace-deps {org.clojure/clojure {:mvn/version "1.12.1"}}
+             :replace-paths ["src"]}}}
