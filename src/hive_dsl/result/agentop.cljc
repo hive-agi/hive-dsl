@@ -7,7 +7,6 @@
      tap          — side-effecting inspection (identity for Result value)
      recover      — Err -> Result via a recovery fn
      retry-on     — repeat a Result-producing thunk on matching Err
-     fan-out      — run coll of 0-arg Result-thunks in parallel
      fan-in       — combine coll<Result<a>> into Result<vector<a>>
      with-budget  — atomically deduct cost from a budget atom before op
      with-persona — bind *persona* for the duration of op; enrich Err
@@ -22,7 +21,10 @@
      compute was performed, account for it. Callers wanting refund-on-Err
      should wrap with `recover` + an explicit refund.
    - `*persona*` and `*crdt*` are thread-local dynamic vars; they do NOT
-     leak across future/thread boundaries unless caller uses `bound-fn`."
+     leak across future/thread boundaries unless caller uses `bound-fn`.
+   - Host contract: every combinator but `retry-on` is host-free. `retry-on`
+     touches the host only when `:backoff-ms` yields a positive value.
+     Parallel fan-out is bounded process and lives in hive-weave.parallel."
   (:require [hive-dsl.result :as r]))
 
 ;; =============================================================================
@@ -113,27 +115,6 @@
   [results]
   (collect-results (vec results)))
 
-(defn fan-out
-  "Run a collection of 0-arg Result-thunks in parallel via futures.
-   Returns the combined Result (semantics of fan-in over the thunk results).
-   Any exception thrown by a thunk becomes an Err via hive-dsl.result/try-effect."
-  [thunks]
-  (let [futs (mapv (fn [t]
-                     (future
-                       (try
-                         (let [x (t)]
-                           (if (or (r/ok? x) (r/err? x))
-                             x
-                             (r/ok x)))
-                         (catch InterruptedException ie
-                           (throw ie))
-                         (catch Throwable t
-                           (r/err :thunk-threw {:exception (.getMessage t)
-                                                :class (.getName (class t))})))))
-                   thunks)
-        results (mapv deref futs)]
-    (fan-in results)))
-
 ;; =============================================================================
 ;; with-budget — monotonic atomic deduction
 ;; =============================================================================
@@ -142,18 +123,18 @@
   "Atomically deduct cost from budget-atom iff remaining >= cost.
    Returns [:deducted new-remaining] or [:exhausted current-remaining].
 
-   Decision is made from `old` (pre-swap value), not by comparing old/new —
+   Decision is made from `old` (pre-CAS value), not by comparing old/new —
    that way cost=0 on a budget of 0 still counts as :deducted (legitimate
    no-op) rather than :exhausted."
   [budget-atom cost]
-  (let [[old new] (swap-vals! budget-atom
-                              (fn [remaining]
-                                (if (>= remaining cost)
-                                  (- remaining cost)
-                                  remaining)))]
-    (if (>= old cost)
-      [:deducted new]
-      [:exhausted old])))
+  (loop []
+    (let [old @budget-atom
+          new (if (>= old cost) (- old cost) old)]
+      (if (compare-and-set! budget-atom old new)
+        (if (>= old cost)
+          [:deducted new]
+          [:exhausted old])
+        (recur)))))
 
 (defn with-budget
   "Atomically deduct cost from budget-atom, then run (op) — a 0-arg thunk

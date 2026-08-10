@@ -89,15 +89,6 @@
 ;; fan-out
 ;; -----------------------------------------------------------------------------
 
-(deftest fan-out-parallel-all-ok
-  (let [thunks [#(r/ok :a) #(r/ok :b) #(r/ok :c)]]
-    (is (= (r/ok [:a :b :c]) (a/fan-out thunks)))))
-
-(deftest fan-out-exception-becomes-err
-  (let [result (a/fan-out [#(r/ok :fine) #(throw (ex-info "boom" {}))])]
-    (is (r/err? result))
-    (is (some #(= :thunk-threw (:error %)) (:err/partials result)))))
-
 ;; -----------------------------------------------------------------------------
 ;; with-budget
 ;; -----------------------------------------------------------------------------

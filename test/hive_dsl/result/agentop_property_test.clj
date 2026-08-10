@@ -102,12 +102,6 @@
 ;; fan-out: commutes with fan-in over synchronous thunks
 ;; -----------------------------------------------------------------------------
 
-(defspec fan-out-matches-fan-in-on-pure-thunks 30
-  (prop/for-all [vs (gen/vector gen/int 0 8)]
-    (let [thunks (mapv (fn [v] #(r/ok v)) vs)]
-      (= (a/fan-in (mapv #(%) thunks))
-         (a/fan-out thunks)))))
-
 ;; -----------------------------------------------------------------------------
 ;; with-budget: concurrent deduction monotonicity
 ;; -----------------------------------------------------------------------------
