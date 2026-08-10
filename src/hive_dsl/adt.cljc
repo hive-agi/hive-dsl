@@ -292,9 +292,8 @@
    - `type-name?` predicate fn
    - `->type-name` keyword coercion fn (returns nil for invalid keywords)
 
-   The variant set is built once at load time from an emitted vector and
-   referenced by a private var; it is never embedded as a set literal in the
-   expansion.
+   The variant set is built once at load time from an emitted vector and read
+   back from `TypeName`; it is never embedded as a set literal in the expansion.
 
    Example:
      (defadt EventType
@@ -334,17 +333,14 @@
         pred-sym (symbol (str kname "?"))
         coerce-sym (symbol (str "->" kname))
         malli-sym (symbol (str (name type-name) "Malli"))
-        variants-sym (vary-meta (symbol (str "-" kname "-variants"))
-                                assoc :private true)]
+        variants-ref `(:variants ~type-name)]
     (register-type! type-kw {:variants variant-set :schemas schemas-form})
     `(do
-       (def ~variants-sym (set ~variant-kws))
-
        (def ~(vary-meta type-name assoc
                         :doc (or docstring (str "ADT type " type-kw))
                         :adt-type type-kw)
          {:type ~type-kw
-          :variants ~variants-sym
+          :variants (set ~variant-kws)
           :schemas ~schemas-form})
 
        (def ~malli-sym
@@ -353,7 +349,7 @@
                " the declared field predicates.")
          '~(variants->malli-form type-kw parsed))
 
-       (register-type! ~type-kw {:variants ~variants-sym
+       (register-type! ~type-kw {:variants ~variants-ref
                                  :schemas ~schemas-form})
 
        (defn ~constructor-sym
@@ -362,18 +358,18 @@
                "  (" kname " variant-keyword data-map) for data variants\n\n"
                "  Throws ex-info for unknown variants.")
          ([variant-kw#]
-          (when-not (contains? ~variants-sym variant-kw#)
+          (when-not (contains? ~variants-ref variant-kw#)
             (throw (ex-info (str "Unknown " ~(name type-name) " variant: " variant-kw#)
                             {:type ~type-kw
                              :variant variant-kw#
-                             :valid-variants ~variants-sym})))
+                             :valid-variants ~variants-ref})))
           {:adt/type ~type-kw :adt/variant variant-kw#})
          ([variant-kw# data#]
-          (when-not (contains? ~variants-sym variant-kw#)
+          (when-not (contains? ~variants-ref variant-kw#)
             (throw (ex-info (str "Unknown " ~(name type-name) " variant: " variant-kw#)
                             {:type ~type-kw
                              :variant variant-kw#
-                             :valid-variants ~variants-sym})))
+                             :valid-variants ~variants-ref})))
           (merge {:adt/type ~type-kw :adt/variant variant-kw#} data#)))
 
        (defn ~pred-sym
@@ -385,7 +381,7 @@
          ~(str "Coerce a keyword to a " (name type-name) " variant (no data fields).\n"
                "  Returns nil if keyword is not a valid variant.")
          [kw#]
-         (when (contains? ~variants-sym kw#)
+         (when (contains? ~variants-ref kw#)
            {:adt/type ~type-kw :adt/variant kw#}))
 
        ~type-kw)))

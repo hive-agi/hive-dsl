@@ -39,6 +39,13 @@
   "t/defalias `alias-name` as the per-variant HMap union of the ADT
    registered under `type-kw`. The type's defadt namespace must be loaded.
 
+   Also annotates the ADT's own descriptor var (the `TypeName` symbol derived
+   from `type-kw`) as TypeMeta — defadt's generated constructors read
+   `(:variants TypeName)` at run time.
+
    (defadt-alias EventTypeV :EventType)"
   [alias-name type-kw]
-  `(t/defalias ~alias-name ~(emit/adt-union type-kw)))
+  (let [descriptor-sym (symbol (name type-kw))]
+    `(do
+       (t/ann ~descriptor-sym TypeMeta)
+       (t/defalias ~alias-name ~(emit/adt-union type-kw)))))
