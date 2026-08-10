@@ -180,6 +180,24 @@
          (err ~category {:message (ex-message ~e)
                          :class  (str (type ~e))})))))
 
+(defn- host-catch-all
+  "Catch class for a catch-everything handler, chosen for the EXPANSION host.
+   'Throwable where the host has it, :default otherwise (ClojureScript and the
+   class-free native runtimes)."
+  [cljs?]
+  (if (or cljs? (nil? (resolve 'Throwable))) :default 'Throwable))
+
+(defn- host-meta-check
+  "Form testing whether `sym` can carry metadata on the EXPANSION host.
+   Falls back to `coll?` where neither IWithMeta nor IObj exists; nil and
+   scalars then read as metadata-incapable, which matches the documented
+   fallback behaviour."
+  [cljs? sym]
+  (cond
+    cljs?                        (list 'satisfies? 'cljs.core/IWithMeta sym)
+    (resolve 'clojure.lang.IObj) (list 'instance? 'clojure.lang.IObj sym)
+    :else                        (list 'coll? sym)))
+
 (defmacro try-effect-throwable*
   "Like try-effect* but catches ANY Throwable (not just Exception) on the JVM.
    Use ONLY at supervision boundaries where an Error must degrade to an err
@@ -197,8 +215,7 @@
    => (ok result) or (err :addon/load-failed {:message \"...\" :class \"...\"})"
   [category & body]
   (let [e         (gensym "e")
-        ;; CLJS :default already catches everything; on the JVM widen to Throwable.
-        catch-sym (if (:ns &env) :default 'Throwable)]
+        catch-sym (host-catch-all (boolean (:ns &env)))]
     `(try
        (ok (do ~@body))
        (catch ~catch-sym ~e
@@ -226,10 +243,8 @@
   (let [cljs?      (boolean (:ns &env))
         e          (gensym "e")
         fb         (gensym "fb")
-        catch-sym  (if cljs? :default 'Throwable)
-        meta-check (if cljs?
-                     (list 'satisfies? 'cljs.core/IWithMeta fb)
-                     (list 'instance? 'clojure.lang.IObj fb))]
+        catch-sym  (host-catch-all cljs?)
+        meta-check (host-meta-check cljs? fb)]
     `(try ~@body
           (catch ~catch-sym ~e
             (let [~fb ~fallback]
@@ -300,18 +315,22 @@
   ([f fallback]
    (fn [& args]
      (try (apply f args)
-          (catch #?(:clj Throwable :cljs :default) _ fallback)))))
+          (catch #?(:clj Throwable :cljs :default :default :default) _ fallback)))))
 
 (defn guard-fn
   "Like rescue-fn but catches a specific class. For selective pipelines.
 
    (keep (guard-fn Exception #(parse %)) items)
-   (map  (guard-fn IOException #(read %) :missing) items)"
+   (map  (guard-fn IOException #(read %) :missing) items)
+
+   Host-bound: `catch-class` is a host class and the dispatch goes through
+   `instance?`, so this needs a host with classes (JVM, ClojureWasm). Use
+   `rescue-fn` where the code must also run on a class-free runtime."
   ([catch-class f] (guard-fn catch-class f nil))
   ([catch-class f fallback]
    (fn [& args]
      (try (apply f args)
-          (catch #?(:clj Throwable :cljs :default) t
+          (catch #?(:clj Throwable :cljs :default :default :default) t
             (if (instance? catch-class t)
               fallback
               (throw t)))))))
@@ -334,11 +353,12 @@
 (defn resolve-warn-fn
   "Best-effort lookup of clojure.tools.logging/warn. Returns fn or nil.
    Public because rescue-log/rescue-interrupt macros expand to call sites
-   that resolve this var in the caller's namespace. On cljs there is no
-   runtime var resolution; returns nil (logger degrades silently)."
+   that resolve this var in the caller's namespace. Returns nil on any host
+   without runtime var resolution (logger degrades silently)."
   []
   #?(:clj  (rescue nil (requiring-resolve 'clojure.tools.logging/warn))
-     :cljs nil))
+     :cljs nil
+     :default nil))
 
 (defmacro rescue-log
   "Like `rescue`, but logs the exception via `clojure.tools.logging/warn`
@@ -351,16 +371,15 @@
 
    `label` — short call-site identifier, appears in log output
    `fallback` — returned on any throwable caught
-   Logger degrades silently when clojure.tools.logging is absent (always on cljs)."
+   Logger degrades silently where clojure.tools.logging is absent (always on
+   cljs and on the class-free native runtimes)."
   [label fallback & body]
   (let [cljs?      (boolean (:ns &env))
         e          (gensym "e")
         fb         (gensym "fb")
         wf         (gensym "warn-fn")
-        catch-sym  (if cljs? :default 'Throwable)
-        meta-check (if cljs?
-                     (list 'satisfies? 'cljs.core/IWithMeta fb)
-                     (list 'instance? 'clojure.lang.IObj fb))]
+        catch-sym  (host-catch-all cljs?)
+        meta-check (host-meta-check cljs? fb)]
     `(try ~@body
           (catch ~catch-sym ~e
             (when-let [~wf (resolve-warn-fn)]

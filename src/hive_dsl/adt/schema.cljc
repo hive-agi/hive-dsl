@@ -15,12 +15,14 @@
   (:require [hive-dsl.adt :as adt]))
 
 (defn- resolve-malli
-  "{:validate .. :explain ..} from malli.core, or nil when malli is absent."
+  "{:validate .. :explain ..} from malli.core, or nil when malli is absent
+   or the host has no runtime var resolution."
   []
   #?(:clj  (try {:validate (requiring-resolve 'malli.core/validate)
                  :explain  (requiring-resolve 'malli.core/explain)}
                 (catch Throwable _ nil))
-     :cljs nil))
+     :cljs nil
+     :default nil))
 
 (def pred->schema
   "Core predicate fn -> symbolic malli schema (generator-capable, EDN-safe).
