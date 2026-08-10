@@ -31,19 +31,11 @@
   (cond
     (nil? v)     (r/ok nil)
     (integer? v) (r/ok (long v))
-    (string? v)  #?(:clj
-                    (try
-                      (r/ok (Long/parseLong v))
-                      (catch NumberFormatException _
-                        (r/err :coerce/invalid-int
-                               {:message (str "Expected integer, got \"" v "\"")
-                                :value v})))
-                    :cljs
-                    (if (re-matches #"[+-]?\d+" v)
-                      (r/ok (js/parseInt v 10))
-                      (r/err :coerce/invalid-int
-                             {:message (str "Expected integer, got \"" v "\"")
-                              :value v})))
+    (string? v)  (if-let [n (parse-long v)]
+                   (r/ok n)
+                   (r/err :coerce/invalid-int
+                          {:message (str "Expected integer, got \"" v "\"")
+                           :value v}))
     (number? v)  (r/ok (long v))
     :else        (r/err :coerce/invalid-int
                         {:message (str "Expected integer, got " (type v) ": " (pr-str v))
@@ -54,28 +46,19 @@
 
    \"0.9\" → {:ok 0.9}
    0.9   → {:ok 0.9}
-   nil   → {:ok nil}"
+   nil   → {:ok nil}
+
+   Surrounding whitespace is trimmed before parsing."
   [v]
   (cond
     (nil? v)     (r/ok nil)
     (double? v)  (r/ok v)
     (number? v)  (r/ok (double v))
-    (string? v)  #?(:clj
-                    (try
-                      (r/ok (Double/parseDouble v))
-                      (catch NumberFormatException _
-                        (r/err :coerce/invalid-double
-                               {:message (str "Expected number, got \"" v "\"")
-                                :value v})))
-                    :cljs
-                    (let [t (str/trim v)
-                          n (js/parseFloat t)]
-                      (if (and (not (js/isNaN n))
-                               (re-matches #"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?" t))
-                        (r/ok n)
-                        (r/err :coerce/invalid-double
-                               {:message (str "Expected number, got \"" v "\"")
-                                :value v}))))
+    (string? v)  (if-let [n (parse-double (str/trim v))]
+                   (r/ok n)
+                   (r/err :coerce/invalid-double
+                          {:message (str "Expected number, got \"" v "\"")
+                           :value v}))
     :else        (r/err :coerce/invalid-double
                         {:message (str "Expected number, got " (type v) ": " (pr-str v))
                          :value v})))
@@ -123,7 +106,11 @@
 
    [\"a\"]       → {:ok [\"a\"]}
    \"[\\\"a\\\"]\" → {:ok [\"a\"]}  (JSON parse)
-   nil          → {:ok nil}"
+   nil          → {:ok nil}
+
+   The JSON branch needs a host JSON reader. On a host that provides none the
+   result is {:error :coerce/json-unsupported ...}; every other branch is
+   host-free."
   [v]
   (cond
     (nil? v)        (r/ok nil)
@@ -132,16 +119,22 @@
     (string? v)     (if (str/starts-with? (str/trim v) "[")
                       (try
                         (let [parsed #?(:clj  (json/read-str v)
-                                        :cljs (js->clj (js/JSON.parse v)))]
+                                        :cljs (js->clj (js/JSON.parse v))
+                                        :default (throw (ex-info "No host JSON reader"
+                                                                 {:category :coerce/json-unsupported})))]
                           (if (sequential? parsed)
                             (r/ok (vec parsed))
                             (r/err :coerce/invalid-vec
                                    {:message "JSON parsed to non-array"
                                     :value v})))
-                        (catch #?(:clj Exception :cljs :default) e
-                          (r/err :coerce/invalid-vec
-                                 {:message (str "Invalid JSON array: " (ex-message e))
-                                  :value v})))
+                        (catch #?(:clj Exception :default :default) e
+                          (if (= :coerce/json-unsupported (:category (ex-data e)))
+                            (r/err :coerce/json-unsupported
+                                   {:message "Host provides no JSON reader"
+                                    :value v})
+                            (r/err :coerce/invalid-vec
+                                   {:message (str "Invalid JSON array: " (ex-message e))
+                                    :value v}))))
                       (r/err :coerce/invalid-vec
                              {:message (str "Expected array, got string: \"" (subs v 0 (min 50 (count v))) "\"")
                               :value v}))
