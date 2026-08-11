@@ -46,7 +46,9 @@
 ;; ADT Registry (parallel to result.taxonomy registry)
 ;; =============================================================================
 
-(defonce ^:private registry (atom {}))
+(defonce registry (atom {}))
+
+(alter-meta! (var registry) assoc :private true)
 
 (defn register-type!
   "Register an ADT type with its variant set and schemas.
