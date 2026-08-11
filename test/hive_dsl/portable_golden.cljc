@@ -5,17 +5,30 @@
    hive-dsl.portable-cases. Host-free data only.")
 
 (def expected
+  (quote
 {:coerce/int-pad
  {:error :coerce/invalid-int,
   :message "Expected integer, got \" 42 \"",
   :value " 42 "},
  :coerce/double-pad {:ok 1.5},
+ :identity/scope-global
+ {:adt/variant :project/global, :adt/type :ProjectScope},
  :agentop/recover {:ok :fixed},
  :result/map-ok {:ok 3},
  :result/err? true,
+ :emit/variant-hmap
+ (typed.clojure/HMap
+  :mandatory
+  {:adt/type (typed.clojure/Val :CallerId),
+   :adt/variant (typed.clojure/Val :caller/named),
+   :slave-id typed.clojure/Str}),
+ :identity/caller-key "coordinator",
+ :identity/caller-id? true,
  :result/rescue-nil nil,
  :result/bind {:ok 3},
  :agentop/fan-in-err :partial,
+ :identity/coordinator-str
+ {:adt/variant :caller/coordinator, :adt/type :CallerId},
  :coerce/double-bad
  {:error :coerce/invalid-double,
   :message "Expected number, got \"x\"",
@@ -25,13 +38,24 @@
  :coerce/enum-ok {:ok :both},
  :coerce/int-num {:ok 7},
  :agentop/retry-ok {:ok :first},
+ :identity/scope? true,
  :batch/normalize-map [{:a 1}],
+ :identity/piggyback-global "slave-7",
  :coerce/double {:ok 1.5},
  :result/err {:error :boom, :a 1},
+ :emit/pred-fn typed.clojure/Str,
+ :identity/scope-string-nil nil,
+ :emit/pred-sym typed.clojure/Str,
  :agentop/budget-out
  {:error :budget-exhausted, :budget/remaining 1, :budget/needed 3},
  :adt/valid false,
+ :identity/scope-scoped
+ {:adt/variant :project/scoped,
+  :adt/type :ProjectScope,
+  :project-id "hive"},
  :coerce/int {:ok 42},
+ :identity/coordinator
+ {:adt/variant :caller/coordinator, :adt/type :CallerId},
  :swarm/status? true,
  :result/rescue-ok 42,
  :result/try-effect :effect/exception,
@@ -42,19 +66,32 @@
  :taxonomy/known-error false,
  :result/rescue-coll [],
  :conv/status? true,
+ :identity/buffer-key ["slave-7" "hive"],
  :coerce/int-bad
  {:error :coerce/invalid-int,
   :message "Expected integer, got \"x\"",
   :value "x"},
+ :emit/pred-sym-map
+ (typed.clojure/Map typed.clojure/Any typed.clojure/Any),
+ :identity/buffer-key-global ["coordinator" "global"],
  :swarm/->status
  {:adt/variant :slave-status/working, :adt/type :SlaveStatus},
+ :identity/piggyback "slave-7-hive",
  :result/ok {:ok 1},
  :result/rescue-log :fb,
  :coerce/boolean {:ok true},
+ :identity/scope-string "hive",
  :resource/scope-acq {:ok :db},
  :swarm/->status-bad nil,
+ :emit/adt-union-missing
+ {:portable-cases/threw
+  "adt-union: ADT type not registered: :NoSuchAdtType"},
  :result/rescue-fn :fb,
  :coerce/keyword {:ok :abc},
+ :identity/named
+ {:adt/variant :caller/named,
+  :adt/type :CallerId,
+  :slave-id "slave-7"},
  :result/rescue-meta "boom",
  :result/let-ok {:ok 6},
  :agentop/budget-ok {:ok :ran},
@@ -65,8 +102,21 @@
  :swarm/status
  {:adt/variant :slave-status/zombie, :adt/type :SlaveStatus},
  :result/map-ok-err {:error :e},
+ :identity/caller-string "slave-7",
  :adt/type :Foo,
+ :emit/pred-unknown typed.clojure/Any,
  :agentop/fan-in-ok {:ok [1 2]},
  :agentop/tap {:ok 1},
+ :emit/adt-union
+ (typed.clojure/U
+  (typed.clojure/HMap
+   :mandatory
+   {:adt/type (typed.clojure/Val :CallerId),
+    :adt/variant (typed.clojure/Val :caller/coordinator)})
+  (typed.clojure/HMap
+   :mandatory
+   {:adt/type (typed.clojure/Val :CallerId),
+    :adt/variant (typed.clojure/Val :caller/named),
+    :slave-id typed.clojure/Str})),
  :batch/count 0}
-)
+))

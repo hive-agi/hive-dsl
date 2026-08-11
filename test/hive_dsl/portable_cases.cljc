@@ -15,7 +15,9 @@
             [hive-dsl.conversation :as conv]
             [hive-dsl.swarm-status :as ss]
             [hive-dsl.resource :as res]
-            [hive-dsl.batch :as b]))
+            [hive-dsl.batch :as b]
+            [hive-dsl.context.identity :as ci]
+            [hive-dsl.typed.emit :as te]))
 
 (def cases
   "Ordered [id thunk] pairs. Ids are stable; a thunk must be deterministic."
@@ -67,7 +69,37 @@
    [:batch/normalize-map  #(b/normalize-tx-datum {:a 1})]
    [:batch/normalize-vec  #(b/normalize-tx-datum [:db/add 1 :a 2])]
    [:batch/count          #(b/batch-count (b/tx-batch :conn (fn [_ _] nil)))]
-   [:resource/scope-acq   #(let [s (atom [])] (res/scope-acquire! s (fn [x] (r/ok x)) [:db]))]])
+   [:resource/scope-acq   #(let [s (atom [])] (res/scope-acquire! s (fn [x] (r/ok x)) [:db]))]
+   ;; context.identity — the ADT constructors, both projections, both coercions
+   [:identity/coordinator     #(ci/parse-caller-id nil)]
+   [:identity/named           #(ci/parse-caller-id "slave-7")]
+   [:identity/coordinator-str #(ci/parse-caller-id "coordinator")]
+   [:identity/caller-id?      #(ci/caller-id? (ci/parse-caller-id "slave-7"))]
+   [:identity/caller-string   #(ci/caller-id-string (ci/parse-caller-id "slave-7"))]
+   [:identity/caller-key      #(ci/caller-id-key (ci/parse-caller-id nil))]
+   [:identity/scope-global    #(ci/parse-project-scope nil)]
+   [:identity/scope-scoped    #(ci/parse-project-scope "hive")]
+   [:identity/scope?          #(ci/project-scope? (ci/parse-project-scope "hive"))]
+   [:identity/scope-string    #(ci/project-scope-string (ci/parse-project-scope "hive"))]
+   [:identity/scope-string-nil #(ci/project-scope-string (ci/parse-project-scope nil))]
+   [:identity/buffer-key      #(ci/make-buffer-key (ci/parse-caller-id "slave-7")
+                                                   (ci/parse-project-scope "hive"))]
+   [:identity/buffer-key-global #(ci/make-buffer-key (ci/parse-caller-id nil)
+                                                     (ci/parse-project-scope nil))]
+   [:identity/piggyback       #(ci/make-piggyback-agent-id (ci/parse-caller-id "slave-7")
+                                                           (ci/parse-project-scope "hive"))]
+   [:identity/piggyback-global #(ci/make-piggyback-agent-id (ci/parse-caller-id "slave-7")
+                                                            (ci/parse-project-scope nil))]
+   ;; typed.emit — both `pred-type` lookup tables, and the union over a
+   ;; registered ADT. The fn-object rung goes through `resolve` at load time,
+   ;; so it is the one entry here whose answer the runtimes could disagree on.
+   [:emit/pred-sym            #(te/pred-type 'string?)]
+   [:emit/pred-sym-map        #(te/pred-type 'map?)]
+   [:emit/pred-fn             #(te/pred-type string?)]
+   [:emit/pred-unknown        #(te/pred-type 'no-such-pred?)]
+   [:emit/variant-hmap        #(te/variant-hmap :CallerId :caller/named)]
+   [:emit/adt-union           #(te/adt-union :CallerId)]
+   [:emit/adt-union-missing   #(te/adt-union :NoSuchAdtType)]])
 
 (defn observe
   "Run every case, returning {id value}. A throwing thunk records
