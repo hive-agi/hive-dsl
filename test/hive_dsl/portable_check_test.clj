@@ -100,19 +100,12 @@
 
 (def ^:private cloture-unloadable
   "Portable-core namespaces the cloture arm cannot load, each with the gap that
-   stops it. Measured 2026-08-18 against BuddhiLW/cloture 4be5450."
-  {"src/hive_dsl/conversation.cljc"
-   "defadt varies the var's metadata, and clojure.core/assoc is 3-arity only"
-   "src/hive_dsl/swarm_status.cljc"
-   "defadt varies the var's metadata, and clojure.core/assoc is 3-arity only"
-   "src/hive_dsl/context/identity.cljc"
-   "defadt varies the var's metadata, and clojure.core/assoc is 3-arity only"
-   "src/hive_dsl/typed/emit.cljc"
-   "(into {} (keep f) coll) — no transducers, so keep has no 1-arity"})
+   stops it. Empty since 2026-08-18, measured against BuddhiLW/cloture 47970a6."
+  {})
 
 (def ^:private cloture-agrees-at-least
   "Cases the cloture arm reproduced on 2026-08-18. A ratchet, not a target."
-  12)
+  69)
 
 (defn- parse-arm-output
   "The arm's verdict as {:kind :agrees :total :unloadable}, or nil when it
