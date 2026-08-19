@@ -66,14 +66,13 @@
    unresolved. Rewrite to a plain `let` with every binding flattened so
    kondo resolves them and still analyzes the body + binding exprs.
 
-   Each ok-binding expr is wrapped in `identity` so the bound symbol carries
-   no inferred type: the expression is a Result, the symbol is the unwrapped
-   payload, and propagating the Result's type reports every downstream use of
-   the payload as a mismatch."
+   Each ok-binding expr is rewritten to `(:ok expr)`, which is what the macro
+   binds at runtime. Binding the Result expression directly gives the symbol
+   the Result's type, and every downstream use of the payload then reports a
+   mismatch against it."
   [{:keys [node]}]
   (let [unwrap (fn [expr]
-                 (api/list-node
-                  [(api/token-node 'clojure.core/identity) expr]))
+                 (api/list-node [(api/keyword-node :ok) expr]))
         [_ binding-vec & body] (:children node)
         flat (loop [bs (seq (:children binding-vec)) acc []]
                (if (empty? bs)
