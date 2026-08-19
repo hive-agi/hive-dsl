@@ -38,12 +38,11 @@
             (list* (api/token-node 'do) body))}))
 
 (defn try-effect*
-  "Hook for (try-effect* :category & body).
-   Skips category keyword, analyzes body."
+  "Hook for (try-effect* category & body).
+   Analyzes category as an expression + body."
   [{:keys [node]}]
-  (let [[_category & body] (rest (:children node))]
-    {:node (api/list-node
-            (list* (api/token-node 'do) body))}))
+  (let [[category & body] (rest (:children node))]
+    {:node (leading-then-body [category] body)}))
 
 (defn rescue-log
   "Hook for (rescue-log label fallback & body).
