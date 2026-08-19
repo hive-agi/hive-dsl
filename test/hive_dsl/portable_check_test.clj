@@ -6,13 +6,19 @@
    HIVE_CLJW_BIN / HIVE_CLJRS_BIN, else from `[:runtimes <rt> :binary]` in
    ~/.config/hive-mcp/config.edn, the same key hive-emacs reads.
 
+   The cloture arm drives an sbcl image instead, through the runner script in
+   test/native; it resolves from HIVE_SBCL_BIN, then the same config key, then
+   PATH.
+
    An unresolvable binary skips. Set HIVE_REQUIRE_NATIVE_ARMS=1 to make it a
-   failure instead, so a run that is supposed to cover all three runtimes
-   cannot pass by silently covering one."
+   failure instead, so a run that is supposed to cover every runtime cannot
+   pass by silently covering one."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.java.shell :as shell]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
+            [hive-dsl.portable-cases :as cases]
             [hive-dsl.portable-check :as check]))
 
 (def ^:private config-file
@@ -33,13 +39,26 @@
             (get-in [:runtimes runtime :binary])
             expand-home)))
 
-(defn- resolve-binary
-  "An executable path for `runtime`, or nil. Env var wins over config."
-  [runtime env-var]
-  (->> [(System/getenv env-var) (configured-binary runtime)]
-       (keep identity)
-       (filter #(.canExecute (io/file %)))
+(defn- on-path
+  "The first executable named `program` on PATH, or nil."
+  [program]
+  (->> (str/split (or (System/getenv "PATH") "") (re-pattern java.io.File/pathSeparator))
+       (map #(io/file % program))
+       (filter #(.canExecute ^java.io.File %))
+       (map #(.getAbsolutePath ^java.io.File %))
        first))
+
+(defn- resolve-binary
+  "An executable path for `runtime`, or nil. Env var wins over config, which
+   wins over `fallback-program` on PATH."
+  ([runtime env-var] (resolve-binary runtime env-var nil))
+  ([runtime env-var fallback-program]
+   (->> [(System/getenv env-var)
+         (configured-binary runtime)
+         (some-> fallback-program on-path)]
+        (keep identity)
+        (filter #(.canExecute (io/file %)))
+        first)))
 
 (defn- native-arm
   [bin argv]
@@ -71,3 +90,58 @@
     (spit entry "(require '[hive-dsl.portable-check :as pc])\n(pc/report)\n")
     (check-arm :cljrs "HIVE_CLJRS_BIN"
                ["run" "--src-path" "src" "--src-path" "test" (.getAbsolutePath entry)])))
+
+;;; The cloture arm — Clojure hosted on Common Lisp. Unlike cljw and cljrs it
+;;; cannot yet load the whole portable core, so its gate is a ratchet: the
+;;; namespaces it fails on are declared with their reason, and the number of
+;;; cases it agrees on may rise but never fall.
+
+(def ^:private cloture-runner "test/native/cloture_portable_check.lisp")
+
+(def ^:private cloture-unloadable
+  "Portable-core namespaces the cloture arm cannot load, each with the gap that
+   stops it. Measured 2026-08-18 against BuddhiLW/cloture 4be5450."
+  {"src/hive_dsl/conversation.cljc"
+   "defadt varies the var's metadata, and clojure.core/assoc is 3-arity only"
+   "src/hive_dsl/swarm_status.cljc"
+   "defadt varies the var's metadata, and clojure.core/assoc is 3-arity only"
+   "src/hive_dsl/context/identity.cljc"
+   "defadt varies the var's metadata, and clojure.core/assoc is 3-arity only"
+   "src/hive_dsl/typed/emit.cljc"
+   "(into {} (keep f) coll) — no transducers, so keep has no 1-arity"})
+
+(def ^:private cloture-agrees-at-least
+  "Cases the cloture arm reproduced on 2026-08-18. A ratchet, not a target."
+  12)
+
+(defn- parse-arm-output
+  "The arm's verdict as {:kind :agrees :total :unloadable}, or nil when it
+   printed no verdict line at all."
+  [output]
+  (when-let [[_ kind agrees total]
+             (re-find #"portable-check: (PASS|FAIL|LOAD-FAIL) (\d+)/(\d+)" output)]
+    {:kind kind
+     :agrees (parse-long agrees)
+     :total (parse-long total)
+     :unloadable (set (map second (re-seq #"(?m)^load-fail (\S+) ::" output)))}))
+
+(deftest ^:integration cloture-arm-agrees
+  (if-let [bin (resolve-binary :cloture "HIVE_SBCL_BIN" "sbcl")]
+    (let [output (native-arm bin ["--script" cloture-runner])
+          {:keys [kind agrees total unloadable]} (parse-arm-output output)]
+      (is (some? kind) (str "the arm printed no verdict:\n" output))
+      (when kind
+        (testing "the arm ran every case the JVM has"
+          (is (= (count cases/cases) total) output))
+        (testing "the declared unloadable set is exactly what fails"
+          (is (= (set (keys cloture-unloadable)) unloadable)
+              (str "update cloture-unloadable — cloture moved:\n" output)))
+        (testing "agreement with the frozen values never regresses"
+          (is (<= cloture-agrees-at-least agrees)
+              (str "cloture agreed on " agrees ", was " cloture-agrees-at-least
+                   ":\n" output)))))
+    (let [msg (str "no sbcl: set HIVE_SBCL_BIN or [:runtimes :cloture :binary] in "
+                   config-file)]
+      (if (System/getenv "HIVE_REQUIRE_NATIVE_ARMS")
+        (is false msg)
+        (println "SKIP cloture arm -" msg)))))
