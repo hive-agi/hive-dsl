@@ -91,10 +91,10 @@
     (check-arm :cljrs "HIVE_CLJRS_BIN"
                ["run" "--src-path" "src" "--src-path" "test" (.getAbsolutePath entry)])))
 
-;;; The cloture arm — Clojure hosted on Common Lisp. Unlike cljw and cljrs it
-;;; cannot yet load the whole portable core, so its gate is a ratchet: the
-;;; namespaces it fails on are declared with their reason, and the number of
-;;; cases it agrees on may rise but never fall.
+;;; The cloture arm — Clojure hosted on Common Lisp. It agrees on every case
+;;; as of 2026-08-19; the gate stays a ratchet rather than a bare PASS check,
+;;; so that a partial regression is reported as a number rather than as a
+;;; single bit, and so that any namespace that stops loading is named.
 
 (def ^:private cloture-runner "test/native/cloture_portable_check.lisp")
 
@@ -104,8 +104,8 @@
   {})
 
 (def ^:private cloture-agrees-at-least
-  "Cases the cloture arm reproduced on 2026-08-18. A ratchet, not a target."
-  69)
+  "Cases the cloture arm reproduced on 2026-08-19 — all of them. A ratchet."
+  71)
 
 (defn- parse-arm-output
   "The arm's verdict as {:kind :agrees :total :unloadable}, or nil when it
