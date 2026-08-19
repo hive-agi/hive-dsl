@@ -64,9 +64,17 @@
    and a `:let [..]` entry splices ordinary let bindings. `:lint-as let`
    can't model the interleaved `:let`, so its bound symbols read as
    unresolved. Rewrite to a plain `let` with every binding flattened so
-   kondo resolves them and still analyzes the body + binding exprs."
+   kondo resolves them and still analyzes the body + binding exprs.
+
+   Each ok-binding expr is wrapped in `identity` so the bound symbol carries
+   no inferred type: the expression is a Result, the symbol is the unwrapped
+   payload, and propagating the Result's type reports every downstream use of
+   the payload as a mismatch."
   [{:keys [node]}]
-  (let [[_ binding-vec & body] (:children node)
+  (let [unwrap (fn [expr]
+                 (api/list-node
+                  [(api/token-node 'clojure.core/identity) expr]))
+        [_ binding-vec & body] (:children node)
         flat (loop [bs (seq (:children binding-vec)) acc []]
                (if (empty? bs)
                  acc
@@ -74,7 +82,8 @@
                    ;; :let [a 1 b 2] — splice the inner vector's bindings
                    (recur (drop 2 bs) (into acc (:children (second bs))))
                    ;; sym expr pair (sym may be a destructure form)
-                   (recur (drop 2 bs) (conj acc (first bs) (second bs))))))]
+                   (recur (drop 2 bs)
+                          (conj acc (first bs) (unwrap (second bs)))))))]
     {:node (api/list-node
             (list* (api/token-node 'let)
                    (api/vector-node flat)
