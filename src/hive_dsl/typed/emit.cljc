@@ -26,13 +26,41 @@
    'uuid?              'typed.clojure/UUID
    'vector?            '(typed.clojure/Vec typed.clojure/Any)})
 
+#?(:cljs
+   (def ^:private cljs-core-preds
+     "Core predicate symbol -> the fn object, for a host with no runtime
+      `resolve`. A symbol absent here widens to typed.clojure/Any, exactly as
+      an unresolvable var does elsewhere."
+     {'any?               any?
+      'boolean?           boolean?
+      'double?            double?
+      'int?               int?
+      'integer?           integer?
+      'keyword?           keyword?
+      'map?               map?
+      'nat-int?           nat-int?
+      'neg-int?           neg-int?
+      'number?            number?
+      'pos-int?           pos-int?
+      'qualified-keyword? qualified-keyword?
+      'set?               set?
+      'simple-keyword?    simple-keyword?
+      'string?            string?
+      'symbol?            symbol?
+      'uuid?              uuid?
+      'vector?            vector?}))
+
 (def ^:private fn->type
   "Same table keyed by the clojure.core predicate fn objects - the shape the
-   ADT registry holds after its defadt namespace is loaded."
+   ADT registry holds after its defadt namespace is loaded.
+   A predicate this host does not provide is SKIPPED, never named: naming one
+   directly fails the whole namespace to load on a host that lacks it."
   (into {}
         (keep (fn [[s ty]]
-                (when-let [v (resolve (symbol "clojure.core" (name s)))]
-                  [(deref v) ty])))
+                (when-let [f #?(:cljs (get cljs-core-preds s)
+                                :default (when-let [v (resolve (symbol "clojure.core" (name s)))]
+                                           (deref v)))]
+                  [f ty])))
         sym->type))
 
 (defn pred-type
