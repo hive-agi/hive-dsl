@@ -52,9 +52,31 @@
 
 (defn register-type!
   "Register an ADT type with its variant set and schemas.
-   Called by defadt macro — not for direct use."
+   Called by defadt macro — not for direct use.
+
+   `type-meta` may carry `:owner`, the namespace the sum is declared in.
+   Throws when a DIFFERENT owner redeclares `type-kw` with a variant set that
+   disagrees with the standing one. Redeclaring from the same owner is a
+   reload and is allowed; agreeing variant sets from two owners are allowed."
   [type-kw type-meta]
-  (swap! registry assoc type-kw type-meta))
+  (let [{prior-owner :owner prior-variants :variants} (get @registry type-kw)
+        {owner :owner variants :variants} type-meta]
+    (when (and prior-owner owner
+               (not= prior-owner owner)
+               (not= (set prior-variants) (set variants)))
+      (throw (ex-info (str "ADT " type-kw " is already declared by " prior-owner
+                           " with a different variant set, and " owner
+                           " is redeclaring it. The registry is keyed by the type's"
+                           " BARE NAME and adt-case resolves through it, so every match"
+                           " site would be checked against whichever namespace loaded"
+                           " last. Rename one sum, or have one namespace re-export the"
+                           " other.")
+                      {:type type-kw
+                       :declared-by prior-owner
+                       :redeclared-by owner
+                       :only-in-declared (set/difference (set prior-variants) (set variants))
+                       :only-in-redeclared (set/difference (set variants) (set prior-variants))})))
+    (swap! registry assoc type-kw type-meta)))
 
 (defn registered-types
   "Return the map of all registered ADT types."
@@ -297,6 +319,9 @@
    The variant set is built once at load time from an emitted vector and read
    back from `TypeName`; it is never embedded as a set literal in the expansion.
 
+   The type registry is keyed by the type's BARE NAME, so declaring a name
+   another namespace already declared with a DIFFERENT variant set throws.
+
    Example:
      (defadt EventType
        \"Event types for hivemind communication.\"
@@ -316,6 +341,9 @@
                                [(first body) (rest body)]
                                [nil body])
         type-kw (keyword (name type-name))
+        owner (if-let [cljs-ns (:ns &env)]
+                (str (:name cljs-ns))
+                (str *ns*))
         parsed (mapv parse-variant-decl variants)
         _ (when (empty? parsed)
             (throw (ex-info (str "defadt " type-name " requires at least one variant")
@@ -336,7 +364,7 @@
         coerce-sym (symbol (str "->" kname))
         malli-sym (symbol (str (name type-name) "Malli"))
         variants-ref `(:variants ~type-name)]
-    (register-type! type-kw {:variants variant-set :schemas schemas-form})
+    (register-type! type-kw {:variants variant-set :schemas schemas-form :owner owner})
     `(do
        (def ~(vary-meta type-name assoc
                         :doc (or docstring (str "ADT type " type-kw))
@@ -352,7 +380,8 @@
          '~(variants->malli-form type-kw parsed))
 
        (register-type! ~type-kw {:variants ~variants-ref
-                                 :schemas ~schemas-form})
+                                 :schemas ~schemas-form
+                                 :owner ~owner})
 
        (defn ~constructor-sym
          ~(str "Construct a " (name type-name) " variant.\n"
