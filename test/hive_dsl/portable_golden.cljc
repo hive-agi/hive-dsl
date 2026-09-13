@@ -10,6 +10,7 @@
  {:error :coerce/invalid-int,
   :message "Expected integer, got \" 42 \"",
   :value " 42 "},
+ :identity/keys-nil ["coordinator"],
  :coerce/double-pad {:ok 1.5},
  :identity/scope-global
  {:adt/variant :project/global, :adt/type :ProjectScope},
@@ -27,16 +28,19 @@
  :result/rescue-nil nil,
  :result/bind {:ok 3},
  :agentop/fan-in-err :partial,
+ :identity/keys-hex ["slave-7:3f9a0c1e" "slave-7"],
  :identity/coordinator-str
  {:adt/variant :caller/coordinator, :adt/type :CallerId},
  :coerce/double-bad
  {:error :coerce/invalid-double,
   :message "Expected number, got \"x\"",
   :value "x"},
+ :identity/keys-last-colon ["a:b:12345" "a:b"],
  :adt/schema-pred nil,
  :coerce/enum-bad :coerce/invalid-enum,
  :coerce/enum-ok {:ok :both},
  :coerce/int-num {:ok 7},
+ :identity/keys-digits ["coordinator:947426" "coordinator"],
  :agentop/retry-ok {:ok :first},
  :identity/scope? true,
  :batch/normalize-map [{:a 1}],
@@ -56,6 +60,7 @@
  :coerce/int {:ok 42},
  :identity/coordinator
  {:adt/variant :caller/coordinator, :adt/type :CallerId},
+ :identity/session-hex true,
  :swarm/status? true,
  :result/rescue-ok 42,
  :result/try-effect :effect/exception,
@@ -63,6 +68,7 @@
  :batch/normalize-vec [[:db/add 1 :a 2]],
  :result/let-ok-short {:error :stop},
  :result/ok? true,
+ :identity/session-foreign false,
  :taxonomy/known-error false,
  :result/rescue-coll [],
  :conv/status? true,
@@ -74,6 +80,7 @@
  :emit/pred-sym-map
  (typed.clojure/Map typed.clojure/Any typed.clojure/Any),
  :identity/buffer-key-global ["coordinator" "global"],
+ :identity/keys-foreign ["hive:mcp"],
  :swarm/->status
  {:adt/variant :slave-status/working, :adt/type :SlaveStatus},
  :identity/piggyback "slave-7-hive",
@@ -102,8 +109,10 @@
  :swarm/status
  {:adt/variant :slave-status/zombie, :adt/type :SlaveStatus},
  :result/map-ok-err {:error :e},
+ :identity/keys-no-colon ["slave-7"],
  :identity/caller-string "slave-7",
  :adt/type :Foo,
+ :identity/session-digits true,
  :emit/pred-unknown typed.clojure/Any,
  :agentop/fan-in-ok {:ok [1 2]},
  :agentop/tap {:ok 1},

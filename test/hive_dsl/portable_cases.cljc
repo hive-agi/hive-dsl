@@ -90,6 +90,15 @@
                                                            (ci/parse-project-scope "hive"))]
    [:identity/piggyback-global #(ci/make-piggyback-agent-id (ci/parse-caller-id "slave-7")
                                                             (ci/parse-project-scope nil))]
+   [:identity/session-digits  #(ci/session-id-shape? "947426")]
+   [:identity/session-hex     #(ci/session-id-shape? "3f9a0c1e")]
+   [:identity/session-foreign #(ci/session-id-shape? "3F9A0C1E")]
+   [:identity/keys-digits     #(ci/caller-id-lookup-keys "coordinator:947426")]
+   [:identity/keys-hex        #(ci/caller-id-lookup-keys "slave-7:3f9a0c1e")]
+   [:identity/keys-no-colon   #(ci/caller-id-lookup-keys "slave-7")]
+   [:identity/keys-foreign    #(ci/caller-id-lookup-keys "hive:mcp")]
+   [:identity/keys-last-colon #(ci/caller-id-lookup-keys "a:b:12345")]
+   [:identity/keys-nil        #(ci/caller-id-lookup-keys nil)]
    ;; typed.emit — both `pred-type` lookup tables, and the union over a
    ;; registered ADT. The fn-object rung goes through `resolve` at load time,
    ;; so it is the one entry here whose answer the runtimes could disagree on.

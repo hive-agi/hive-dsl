@@ -1,0 +1,13 @@
+{:digits-suffix ["coordinator:947426" "coordinator"],
+ :hex-suffix ["coordinator:3f9a0c1e" "coordinator"],
+ :named-digits ["swarm-ling-7:12345" "swarm-ling-7"],
+ :no-colon ["swarm-ling-7"],
+ :coordinator-bare ["coordinator"],
+ :nil-caller ["coordinator"],
+ :empty-string [""],
+ :non-session-suffix ["hive:mcp"],
+ :short-hex-suffix ["coordinator:3f9a0c"],
+ :upper-hex-suffix ["coordinator:3F9A0C1E"],
+ :empty-suffix ["coordinator:"],
+ :empty-base [":12345"],
+ :last-colon ["a:b:12345" "a:b"]}

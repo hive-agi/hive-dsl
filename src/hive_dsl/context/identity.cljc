@@ -6,7 +6,8 @@
    keys from these types — eliminates ad-hoc string construction.
 
    SRP: Pure domain logic, no I/O. Follows kanban/domain.clj precedent."
-  (:require [hive-dsl.adt :refer [defadt adt-case]]))
+  (:require [hive-dsl.adt :refer [defadt adt-case]]
+            [clojure.string :as str]))
 
 ;; =============================================================================
 ;; ADT Definitions
@@ -84,3 +85,40 @@
   (if raw
     (project-scope :project/scoped {:project-id raw})
     (project-scope :project/global)))
+
+;; =============================================================================
+;; Caller-Id Session Suffix
+;; =============================================================================
+
+(def ^:private decimal-digit? (set "0123456789"))
+
+(def ^:private lower-hex-digit? (set "0123456789abcdef"))
+
+(defn session-id-shape?
+  "True when `s` has the shape of a bb-mcp session id (bb-mcp.host.port/session-id):
+   one or more decimal digits (a process id, as exported in BB_MCP_SESSION_ID
+   or read by the bb host), or exactly eight lowercase hex digits (the random
+   UUID prefix a host adapter falls back to). False for any other value, nil
+   and the empty string included."
+  [s]
+  (boolean
+   (and (string? s)
+        (seq s)
+        (or (every? decimal-digit? s)
+            (and (= 8 (count s))
+                 (every? lower-hex-digit? s))))))
+
+(defn caller-id-lookup-keys
+  "Ordered lookup keys for a raw _caller_id, as a vector of one or two strings.
+
+   First the canonical caller id string (nil and \"coordinator\" canonicalise
+   to \"coordinator\", as in parse-caller-id). Second, only when the part after
+   the last colon satisfies session-id-shape? and the part before it is
+   non-empty, that base id with the session suffix removed. bb-mcp produces
+   caller ids as \"<CLAUDE_SWARM_SLAVE_ID or coordinator>:<session-id>\"."
+  [raw]
+  (let [s (caller-id-string (parse-caller-id raw))
+        i (str/last-index-of s ":")]
+    (if (and i (pos? i) (session-id-shape? (subs s (inc i))))
+      [s (subs s 0 i)]
+      [s])))
