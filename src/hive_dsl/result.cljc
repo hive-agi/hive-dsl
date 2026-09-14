@@ -229,6 +229,37 @@
 ;;
 ;; Both return fallback with error info as metadata. No logging, no strings.
 
+(defn- rescue-expand
+  "Private pure expansion builder for the rescue-macro family.
+   Produces a try/catch form with optional logging preamble.
+
+   catch-sym — class/form to catch (Throwable, Exception, :default)
+   log?      — true to emit logging preamble (rescue-log / rescue-ex-log)
+   label     — label form; emitted in :label metadata key (only when log? true)
+   fallback  — fallback value form
+   body      — seq of body forms (the protected expressions)
+   cljs?     — true for ClojureScript expansion"
+  [catch-sym log? label fallback body cljs?]
+  (let [e          (gensym "e")
+        fb         (gensym "fb")
+        meta-check (host-meta-check cljs? fb)]
+    `(try ~@body
+          (catch ~catch-sym ~e
+            ~@(when log?
+                (let [wf (gensym "warn-fn")]
+                  [`(when-let [~wf (resolve-warn-fn)]
+                      (~wf ~e (str ~label " failed: " (ex-message ~e))))]))
+            (let [~fb ~fallback]
+              (if ~meta-check
+                (with-meta ~fb
+                  ~(if log?
+                     `{::error {:message (ex-message ~e)
+                                :label   ~label
+                                :form    ~(str (first body))}}
+                     `{::error {:message (ex-message ~e)
+                                :form    ~(str (first body))}}))
+                ~fb))))))
+
 (defmacro rescue
   "Supervision boundary — catch ANY throwable, return fallback.
    Like Erlang's `catch Expr`: never let a failure propagate.
@@ -240,18 +271,9 @@
 
    Error data shape: {::error {:message \"...\" :form \"(traverse ids)\"}}"
   [fallback & body]
-  (let [cljs?      (boolean (:ns &env))
-        e          (gensym "e")
-        fb         (gensym "fb")
-        catch-sym  (host-catch-all cljs?)
-        meta-check (host-meta-check cljs? fb)]
-    `(try ~@body
-          (catch ~catch-sym ~e
-            (let [~fb ~fallback]
-              (if ~meta-check
-                (with-meta ~fb {::error {:message (ex-message ~e)
-                                         :form    ~(str (first body))}})
-                ~fb))))))
+  (let [cljs?     (boolean (:ns &env))
+        catch-sym (host-catch-all cljs?)]
+    (rescue-expand catch-sym false nil fallback body cljs?)))
 
 (defmacro rescue-ex
   "Exception-only — catch Exception, NOT Error. Prefer this unless you are
@@ -262,18 +284,9 @@
 
    Error data shape: {::error {:message \"...\" :form \"(traverse ids)\"}}"
   [fallback & body]
-  (let [cljs?      (boolean (:ns &env))
-        e          (gensym "e")
-        fb         (gensym "fb")
-        catch-sym  (if (:ns &env) :default 'Exception)
-        meta-check (host-meta-check cljs? fb)]
-    `(try ~@body
-          (catch ~catch-sym ~e
-            (let [~fb ~fallback]
-              (if ~meta-check
-                (with-meta ~fb {::error {:message (ex-message ~e)
-                                         :form    ~(str (first body))}})
-                ~fb))))))
+  (let [cljs?     (boolean (:ns &env))
+        catch-sym (if (:ns &env) :default 'Exception)]
+    (rescue-expand catch-sym false nil fallback body cljs?)))
 
 (defmacro guard
   "Selective catch — like rescue but for a specific Throwable subclass.
@@ -396,22 +409,9 @@
    Logger degrades silently where clojure.tools.logging is absent (always on
    cljs and on the class-free native runtimes)."
   [label fallback & body]
-  (let [cljs?      (boolean (:ns &env))
-        e          (gensym "e")
-        fb         (gensym "fb")
-        wf         (gensym "warn-fn")
-        catch-sym  (host-catch-all cljs?)
-        meta-check (host-meta-check cljs? fb)]
-    `(try ~@body
-          (catch ~catch-sym ~e
-            (when-let [~wf (resolve-warn-fn)]
-              (~wf ~e (str ~label " failed: " (ex-message ~e))))
-            (let [~fb ~fallback]
-              (if ~meta-check
-                (with-meta ~fb {::error {:message (ex-message ~e)
-                                         :label   ~label
-                                         :form    ~(str (first body))}})
-                ~fb))))))
+  (let [cljs?     (boolean (:ns &env))
+        catch-sym (host-catch-all cljs?)]
+    (rescue-expand catch-sym true label fallback body cljs?)))
 
 (defmacro rescue-ex-log
   "Exception-only — like `rescue-log` but catches Exception, NOT Error.
@@ -427,22 +427,9 @@
    Logger degrades silently where clojure.tools.logging is absent (always on
    cljs and on the class-free native runtimes)."
   [label fallback & body]
-  (let [cljs?      (boolean (:ns &env))
-        e          (gensym "e")
-        fb         (gensym "fb")
-        wf         (gensym "warn-fn")
-        catch-sym  (if (:ns &env) :default 'Exception)
-        meta-check (host-meta-check cljs? fb)]
-    `(try ~@body
-          (catch ~catch-sym ~e
-            (when-let [~wf (resolve-warn-fn)]
-              (~wf ~e (str ~label " failed: " (ex-message ~e))))
-            (let [~fb ~fallback]
-              (if ~meta-check
-                (with-meta ~fb {::error {:message (ex-message ~e)
-                                         :label   ~label
-                                         :form    ~(str (first body))}})
-                ~fb))))))
+  (let [cljs?     (boolean (:ns &env))
+        catch-sym (if (:ns &env) :default 'Exception)]
+    (rescue-expand catch-sym true label fallback body cljs?)))
 
 (defmacro rescue-interrupt
   "Like `rescue-log`, but treats `InterruptedException` as a silent

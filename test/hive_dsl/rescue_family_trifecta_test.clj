@@ -1,7 +1,9 @@
 (ns hive-dsl.rescue-family-trifecta-test
   "Trifecta coverage for the rescue family: rescue, rescue-log, rescue-ex, rescue-ex-log."
-  (:require [clojure.test :refer [use-fixtures]]
+  (:require [clojure.test :refer [use-fixtures deftest is]]
             [clojure.test.check.generators :as gen]
+            [clojure.test.check.properties :as prop]
+            [clojure.test.check.clojure-test :as tc]
             [hive-dsl.result :as r]
             [hive-test.trifecta :refer [deftrifecta]]))
 
@@ -165,3 +167,62 @@
                  ["rescue-lets-errors-escape"   mut-rescue-lets-errors-escape]
                  ["log-variants-drop-label"     mut-log-variants-drop-label]
                  ["metadata-on-nil-fallback"    mut-metadata-on-nil-fallback]]})
+
+;; ============================================================
+;; Input-aware oracle — caught?/error-keys must match the
+;; catch-policy, throwable-kind and fallback-kind
+;; ============================================================
+
+(defn- oracle-pass?
+  "Input-aware oracle over the rescue-family outcome.
+   Asserts catching semantics (caught? true for runtime/ex-info in all
+   variants; false for Errors only under rescue-ex/rescue-ex-log). When
+   caught, vector/map fallbacks carry exactly :message + :form (and :label
+   for log variants); nil/keyword fallbacks carry no error metadata."
+  [[variant throwable-kind fallback-kind :as triple]]
+  (let [{:keys [caught? error-keys]} (rescue-outcome triple)
+        error?   (#{:assertion-error :stack-overflow} throwable-kind)
+        ex-only? (#{:rescue-ex :rescue-ex-log} variant)
+        log-var? (#{:rescue-log :rescue-ex-log} variant)]
+    (and
+     ;; Catching semantics
+     (if error?
+       (not= caught? ex-only?)     ;; errors escape ex variants only
+       (true? caught?))             ;; non-errors always caught
+     ;; Error metadata upon catch
+     (if caught?
+       (case fallback-kind
+         (:vector :map)
+         (if log-var?
+           (= #{:message :form :label} error-keys)
+           (= #{:message :form} error-keys))
+         (:nil :keyword)
+         (nil? error-keys))
+       true))))
+
+(tc/defspec rescue-family-caught-property 200
+  (prop/for-all [triple gen-triple]
+    (oracle-pass? triple)))
+
+;; ============================================================
+;; Nil/false label sentinel tests — explicit logging-variant
+;; calls with literal nil and false labels must still use the
+;; logging expansion and keep :label on metadata-capable fallbacks
+;; ============================================================
+
+(defn- label-test
+  "Evaluate (rescue-log label-expr {} (throw (RuntimeException. \"boom\")))
+   and return the :label value from error metadata, or :no-error-meta."
+  [label-expr]
+  (try
+    (let [result   (eval `(r/rescue-log ~label-expr {} (throw (RuntimeException. "boom"))))
+          err-meta (::r/error (meta result))]
+      (if err-meta
+        (:label err-meta)
+        :no-error-meta))
+    (catch Throwable e
+      (str "escaped: " (.getName (class e))))))
+
+(deftest rescue-family-nil-false-labels
+  (is (= nil      (label-test nil))   "nil label must still go through logging expansion")
+  (is (= false    (label-test false)) "false label must still go through logging expansion")))
