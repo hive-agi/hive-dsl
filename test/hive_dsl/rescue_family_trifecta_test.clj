@@ -182,7 +182,7 @@
   [[variant throwable-kind fallback-kind :as triple]]
   (let [{:keys [caught? error-keys]} (rescue-outcome triple)
         error?   (#{:assertion-error :stack-overflow} throwable-kind)
-        ex-only? (#{:rescue-ex :rescue-ex-log} variant)
+        ex-only? (contains? #{:rescue-ex :rescue-ex-log} variant)
         log-var? (#{:rescue-log :rescue-ex-log} variant)]
     (and
      ;; Catching semantics
@@ -200,6 +200,20 @@
          (nil? error-keys))
        true))))
 
+(deftest oracle-rejects-catch-all-expansion
+  (let [catch-all (var-get #'r/rescue)
+        catch-all-log (var-get #'r/rescue-log)
+        original-meta (into {} (map (fn [v] [v (meta v)]) [#'r/rescue-ex #'r/rescue-ex-log]))]
+    (try
+      (with-redefs [r/rescue-ex catch-all r/rescue-ex-log catch-all-log]
+        (doseq [[v m] original-meta] (reset-meta! v m))
+        (doseq [variant [:rescue-ex :rescue-ex-log]
+                throwable [:assertion-error :stack-overflow]
+                fallback [:vector :map :nil :keyword]]
+          (is (false? (oracle-pass? [variant throwable fallback]))
+              (pr-str [variant throwable fallback]))))
+      (finally (doseq [[v m] original-meta] (reset-meta! v m))))))
+
 (tc/defspec rescue-family-caught-property 200
   (prop/for-all [triple gen-triple]
     (oracle-pass? triple)))
@@ -211,18 +225,18 @@
 ;; ============================================================
 
 (defn- label-test
-  "Evaluate (rescue-log label-expr {} (throw (RuntimeException. \"boom\")))
-   and return the :label value from error metadata, or :no-error-meta."
-  [label-expr]
-  (try
-    (let [result   (eval `(r/rescue-log ~label-expr {} (throw (RuntimeException. "boom"))))
-          err-meta (::r/error (meta result))]
-      (if err-meta
-        (:label err-meta)
-        :no-error-meta))
-    (catch Throwable e
-      (str "escaped: " (.getName (class e))))))
+  "Return complete metadata: absent :label differs from a present nil."
+  [variant label]
+  (let [macro-sym (case variant
+                    :rescue-log 'hive-dsl.result/rescue-log
+                    :rescue-ex-log 'hive-dsl.result/rescue-ex-log)
+        result (eval (list macro-sym label {} '(throw (RuntimeException. "boom"))))]
+    (::r/error (meta result))))
 
 (deftest rescue-family-nil-false-labels
-  (is (= nil      (label-test nil))   "nil label must still go through logging expansion")
-  (is (= false    (label-test false)) "false label must still go through logging expansion")))
+  (doseq [variant [:rescue-log :rescue-ex-log]
+          label [nil false]]
+    (let [error (label-test variant label)]
+      (is (= #{:message :form :label} (set (keys error))))
+      (is (contains? error :label))
+      (is (= label (:label error))))))
