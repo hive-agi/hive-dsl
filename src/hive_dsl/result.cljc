@@ -253,6 +253,28 @@
                                          :form    ~(str (first body))}})
                 ~fb))))))
 
+(defmacro rescue-ex
+  "Exception-only — catch Exception, NOT Error. Prefer this unless you are
+   at a true supervision boundary where Error propagation must be stopped.
+
+   (rescue-ex []  (traverse ids))        ;; => [] on failure, error in ^{::error {...}}
+   (rescue-ex nil (get-entry id))        ;; => nil on failure (nil can't carry meta)
+
+   Error data shape: {::error {:message \"...\" :form \"(traverse ids)\"}}"
+  [fallback & body]
+  (let [cljs?      (boolean (:ns &env))
+        e          (gensym "e")
+        fb         (gensym "fb")
+        catch-sym  (if (:ns &env) :default 'Exception)
+        meta-check (host-meta-check cljs? fb)]
+    `(try ~@body
+          (catch ~catch-sym ~e
+            (let [~fb ~fallback]
+              (if ~meta-check
+                (with-meta ~fb {::error {:message (ex-message ~e)
+                                         :form    ~(str (first body))}})
+                ~fb))))))
+
 (defmacro guard
   "Selective catch — like rescue but for a specific Throwable subclass.
    Like Erlang's `try ... catch Class:Reason`: structured error handling
@@ -379,6 +401,37 @@
         fb         (gensym "fb")
         wf         (gensym "warn-fn")
         catch-sym  (host-catch-all cljs?)
+        meta-check (host-meta-check cljs? fb)]
+    `(try ~@body
+          (catch ~catch-sym ~e
+            (when-let [~wf (resolve-warn-fn)]
+              (~wf ~e (str ~label " failed: " (ex-message ~e))))
+            (let [~fb ~fallback]
+              (if ~meta-check
+                (with-meta ~fb {::error {:message (ex-message ~e)
+                                         :label   ~label
+                                         :form    ~(str (first body))}})
+                ~fb))))))
+
+(defmacro rescue-ex-log
+  "Exception-only — like `rescue-log` but catches Exception, NOT Error.
+    Prefer this unless you are at a true supervision boundary where Error
+    propagation must be stopped.
+
+   (rescue-ex-log \"ensure-require\" nil (risky-op))
+   ;; => (risky-op) result on success, nil + warn-log on failure
+
+   `label` — short call-site identifier, appears in log output
+   `fallback` — returned on any Exception caught
+   An Error propagates unchanged.
+   Logger degrades silently where clojure.tools.logging is absent (always on
+   cljs and on the class-free native runtimes)."
+  [label fallback & body]
+  (let [cljs?      (boolean (:ns &env))
+        e          (gensym "e")
+        fb         (gensym "fb")
+        wf         (gensym "warn-fn")
+        catch-sym  (if (:ns &env) :default 'Exception)
         meta-check (host-meta-check cljs? fb)]
     `(try ~@body
           (catch ~catch-sym ~e
