@@ -5,6 +5,7 @@
             [clojure.test.check.properties :as prop]
             [clojure.test.check.clojure-test :as tc]
             [hive-dsl.result :as r]
+            [hive-dsl.result.spec]
             [hive-test.trifecta :refer [deftrifecta]]))
 
 ;; ============================================================

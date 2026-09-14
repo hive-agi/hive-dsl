@@ -148,8 +148,14 @@
 
 ;; rescue-log: rescue + clojure.tools.logging warn on failure.
 ;; (rescue-log "label" fallback body...)
+;; Macro arguments are forms; a label expression may evaluate to nil or false.
 (s/fdef r/rescue-log
-  :args (s/cat :label  string?
+  :args (s/cat :label  any?
+               :fallback any?
+               :body (s/+ any?)))
+
+(s/fdef r/rescue-ex-log
+  :args (s/cat :label any?
                :fallback any?
                :body (s/+ any?)))
 
