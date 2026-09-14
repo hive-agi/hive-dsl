@@ -1,0 +1,200 @@
+{:rescue/assertion-error/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue/assertion-error/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :message}},
+ :rescue/assertion-error/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue/assertion-error/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :message}},
+ :rescue/ex-info/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue/ex-info/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :message}},
+ :rescue/ex-info/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue/ex-info/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :message}},
+ :rescue/runtime/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue/runtime/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :message}},
+ :rescue/runtime/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue/runtime/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :message}},
+ :rescue/stack-overflow/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue/stack-overflow/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :message}},
+ :rescue/stack-overflow/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue/stack-overflow/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :message}},
+ :rescue-ex/assertion-error/keyword
+ {:caught? false, :escaped "class java.lang.AssertionError: boom"},
+ :rescue-ex/assertion-error/map
+ {:caught? false, :escaped "class java.lang.AssertionError: boom"},
+ :rescue-ex/assertion-error/nil
+ {:caught? false, :escaped "class java.lang.AssertionError: boom"},
+ :rescue-ex/assertion-error/vector
+ {:caught? false, :escaped "class java.lang.AssertionError: boom"},
+ :rescue-ex/ex-info/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue-ex/ex-info/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :message}},
+ :rescue-ex/ex-info/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue-ex/ex-info/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :message}},
+ :rescue-ex/runtime/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue-ex/runtime/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :message}},
+ :rescue-ex/runtime/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue-ex/runtime/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :message}},
+ :rescue-ex/stack-overflow/keyword
+ {:caught? false, :escaped "class java.lang.StackOverflowError: boom"},
+ :rescue-ex/stack-overflow/map
+ {:caught? false, :escaped "class java.lang.StackOverflowError: boom"},
+ :rescue-ex/stack-overflow/nil
+ {:caught? false, :escaped "class java.lang.StackOverflowError: boom"},
+ :rescue-ex/stack-overflow/vector
+ {:caught? false, :escaped "class java.lang.StackOverflowError: boom"},
+ :rescue-ex-log/assertion-error/keyword
+ {:caught? false, :escaped "class java.lang.AssertionError: boom"},
+ :rescue-ex-log/assertion-error/map
+ {:caught? false, :escaped "class java.lang.AssertionError: boom"},
+ :rescue-ex-log/assertion-error/nil
+ {:caught? false, :escaped "class java.lang.AssertionError: boom"},
+ :rescue-ex-log/assertion-error/vector
+ {:caught? false, :escaped "class java.lang.AssertionError: boom"},
+ :rescue-ex-log/ex-info/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue-ex-log/ex-info/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :label :message}},
+ :rescue-ex-log/ex-info/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue-ex-log/ex-info/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :label :message}},
+ :rescue-ex-log/runtime/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue-ex-log/runtime/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :label :message}},
+ :rescue-ex-log/runtime/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue-ex-log/runtime/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :label :message}},
+ :rescue-ex-log/stack-overflow/keyword
+ {:caught? false, :escaped "class java.lang.StackOverflowError: boom"},
+ :rescue-ex-log/stack-overflow/map
+ {:caught? false, :escaped "class java.lang.StackOverflowError: boom"},
+ :rescue-ex-log/stack-overflow/nil
+ {:caught? false, :escaped "class java.lang.StackOverflowError: boom"},
+ :rescue-ex-log/stack-overflow/vector
+ {:caught? false, :escaped "class java.lang.StackOverflowError: boom"},
+ :rescue-log/assertion-error/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue-log/assertion-error/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :label :message}},
+ :rescue-log/assertion-error/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue-log/assertion-error/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :label :message}},
+ :rescue-log/ex-info/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue-log/ex-info/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :label :message}},
+ :rescue-log/ex-info/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue-log/ex-info/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :label :message}},
+ :rescue-log/runtime/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue-log/runtime/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :label :message}},
+ :rescue-log/runtime/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue-log/runtime/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :label :message}},
+ :rescue-log/stack-overflow/keyword
+ {:caught? true,
+  :result-class "class clojure.lang.Keyword",
+  :error-keys nil},
+ :rescue-log/stack-overflow/map
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentArrayMap",
+  :error-keys #{:form :label :message}},
+ :rescue-log/stack-overflow/nil
+ {:caught? true, :result-class "", :error-keys nil},
+ :rescue-log/stack-overflow/vector
+ {:caught? true,
+  :result-class "class clojure.lang.PersistentVector",
+  :error-keys #{:form :label :message}}}
