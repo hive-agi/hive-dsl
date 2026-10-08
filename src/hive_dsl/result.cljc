@@ -350,7 +350,7 @@
   ([f fallback]
    (fn [& args]
      (try (apply f args)
-          (catch #?(:clj Throwable :cljs :default :default :default) _ fallback)))))
+          (catch #?(:clj Throwable :cljs :default :cljr Exception :default :default) _ fallback)))))
 
 (defn guard-fn
   "Like rescue-fn but catches a specific class. For selective pipelines.
@@ -365,7 +365,7 @@
   ([catch-class f fallback]
    (fn [& args]
      (try (apply f args)
-          (catch #?(:clj Throwable :cljs :default :default :default) t
+          (catch #?(:clj Throwable :cljs :default :cljr Exception :default :default) t
             (if (instance? catch-class t)
               fallback
               (throw t)))))))

@@ -127,7 +127,7 @@
                             (r/err :coerce/invalid-vec
                                    {:message "JSON parsed to non-array"
                                     :value v})))
-                        (catch #?(:clj Exception :default :default) e
+                        (catch #?(:clj Exception :cljr Exception :default :default) e
                           (if (= :coerce/json-unsupported (:category (ex-data e)))
                             (r/err :coerce/json-unsupported
                                    {:message "Host provides no JSON reader"
