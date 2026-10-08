@@ -151,6 +151,15 @@
            ~@(interleave (repeat g) steps)]
        ~g)))
 
+(defn- host-exception
+  "Catch class for an Exception-only handler, chosen for the EXPANSION host.
+   :default on ClojureScript, python/Exception on Basilisp, 'Exception elsewhere
+   (JVM, ClojureCLR, ClojureWasm, clojurust)."
+  [cljs?]
+  (cond
+    cljs? :default
+    :else #?(:lpy 'python/Exception :default 'Exception)))
+
 (defmacro try-effect
   "Execute body in try/catch, returning ok on success or err on exception.
    Category defaults to :effect/exception.
@@ -159,7 +168,7 @@
    => (ok result) or (err :effect/exception {:message \"...\"})"
   [& body]
   (let [e         (gensym "e")
-        catch-sym (if (:ns &env) :default 'Exception)]
+        catch-sym (host-exception (boolean (:ns &env)))]
     `(try
        (ok (do ~@body))
        (catch ~catch-sym ~e
@@ -173,7 +182,7 @@
    => (ok content) or (err :io/read-failure {:message \"...\"})"
   [category & body]
   (let [e         (gensym "e")
-        catch-sym (if (:ns &env) :default 'Exception)]
+        catch-sym (host-exception (boolean (:ns &env)))]
     `(try
        (ok (do ~@body))
        (catch ~catch-sym ~e
@@ -185,7 +194,10 @@
    'Throwable where the host has it, :default otherwise (ClojureScript and the
    class-free native runtimes)."
   [cljs?]
-  (if (or cljs? (nil? (resolve 'Throwable))) :default 'Throwable))
+  (cond
+    cljs?                 :default
+    (resolve 'Throwable)  'Throwable
+    :else                 #?(:cljr 'Exception :lpy 'python/Exception :default :default)))
 
 (defn- host-meta-check
   "Form testing whether `sym` can carry metadata on the EXPANSION host.
@@ -285,7 +297,7 @@
    Error data shape: {::error {:message \"...\" :form \"(traverse ids)\"}}"
   [fallback & body]
   (let [cljs?     (boolean (:ns &env))
-        catch-sym (if (:ns &env) :default 'Exception)]
+        catch-sym (host-exception (boolean (:ns &env)))]
     (rescue-expand catch-sym false nil fallback body cljs?)))
 
 (defmacro guard
@@ -428,7 +440,7 @@
    cljs and on the class-free native runtimes)."
   [label fallback & body]
   (let [cljs?     (boolean (:ns &env))
-        catch-sym (if (:ns &env) :default 'Exception)]
+        catch-sym (host-exception (boolean (:ns &env)))]
     (rescue-expand catch-sym true label fallback body cljs?)))
 
 (defmacro rescue-interrupt
