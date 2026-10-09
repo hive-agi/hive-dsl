@@ -26,9 +26,14 @@
            'fn?                     'fn?
            'pos?                    [:fn 'pos?]
            '(some-fn nil? int?)     [:maybe 'int?]
+           '(clojure.core/some-fn clojure.core/nil? int?) [:maybe 'int?]
            '(some-fn nil? my/pred?) [:fn '(some-fn nil? my/pred?)]
+           '(my/some-fn nil? int?)  [:fn '(my/some-fn nil? int?)]
+           '(some-fn my/nil? int?)  [:fn '(some-fn my/nil? int?)]
+           '(some-fn (fn* [x] (pos? x)) int?) [:fn '(some-fn (fn* [x] (pos? x)) int?)]
            '(constantly true)       :any
            '(constantly false)      [:fn '(constantly false)]
+           '(my/constantly true)    [:fn '(my/constantly true)]
            'my/pred?                [:fn 'my/pred?]}
    :gen   (gen/elements table-syms)
    :pred  #(and (symbol? %) (some? (m/schema %)))

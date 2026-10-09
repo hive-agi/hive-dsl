@@ -293,11 +293,13 @@
    no generator."
   (into {} (map (fn [[sym _]] [sym sym])) pred-table))
 
-(defn- head-named?
-  "True when form is a list whose head is a symbol named head-name
-   (namespace ignored, so clojure.core/some-fn and some-fn both match)."
-  [form head-name]
-  (and (seq? form) (symbol? (first form)) (= head-name (name (first form)))))
+(defn- core-sym?
+  "True when x is the symbol named sym-name, bare or qualified with
+   clojure.core / cljs.core (so clojure.core/some-fn and some-fn both match,
+   but my/some-fn does not). A non-symbol answers false instead of throwing."
+  [x sym-name]
+  (and (symbol? x) (= sym-name (name x))
+       (contains? #{nil "clojure.core" "cljs.core"} (namespace x))))
 
 (defn- pred-sym->schema
   "Upgrade a declared field predicate to its symbolic malli schema when known;
@@ -309,13 +311,15 @@
     (contains? pred-sym->malli pred-sym)
     (get pred-sym->malli pred-sym)
 
-    (and (head-named? pred-sym "some-fn")
+    (and (seq? pred-sym)
+         (core-sym? (first pred-sym) "some-fn")
          (= 3 (count pred-sym))
-         (= "nil?" (some-> (second pred-sym) name))
+         (core-sym? (second pred-sym) "nil?")
          (contains? pred-sym->malli (nth pred-sym 2)))
     [:maybe (get pred-sym->malli (nth pred-sym 2))]
 
-    (and (head-named? pred-sym "constantly")
+    (and (seq? pred-sym)
+         (core-sym? (first pred-sym) "constantly")
          (= 2 (count pred-sym))
          (true? (second pred-sym)))
     :any
