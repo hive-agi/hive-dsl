@@ -265,19 +265,67 @@
       (str/replace #"([A-Z]+)([A-Z][a-z])" "$1-$2")
       str/lower-case))
 
+(def pred-table
+  "THE predicate table: core predicate symbol -> the evaluated predicate fn.
+   Every key is also a malli built-in predicate schema, measured (malli 0.20.2)
+   to compile under malli.core/schema. Both projections derive from this ONE
+   map: pred-sym->malli (symbols, at macroexpansion) and
+   hive-dsl.adt.schema/pred->schema (evaluated fns, at runtime).
+   pos? is deliberately absent: the core fn throws on a non-number where the
+   malli schema answers false, so upgrading it would change validation."
+  {'any? any? 'boolean? boolean? 'double? double? 'float? float?
+   'fn? fn? 'int? int? 'integer? integer? 'keyword? keyword?
+   'map? map? 'nat-int? nat-int? 'neg-int? neg-int? 'nil? nil?
+   'number? number? 'pos-int? pos-int? 'seq? seq? 'sequential? sequential?
+   'set? set? 'string? string? 'symbol? symbol? 'vector? vector?
+   'ifn? ifn? 'coll? coll? 'some? some?
+   'associative? associative? 'seqable? seqable? 'ident? ident?
+   'uuid? uuid? 'inst? inst?})
+
+(def validate-only-preds
+  "Table entries whose malli schema compiles but has NO generator (measured:
+   malli.generator/generate throws). They validate; they do not generate."
+  #{'fn?})
+
 (def pred-sym->malli
-  "Predicate symbol -> symbolic malli schema (generator-capable, EDN-safe)."
-  {'any? 'any? 'boolean? 'boolean? 'double? 'double? 'float? 'float?
-   'fn? 'fn? 'int? 'int? 'integer? 'integer? 'keyword? 'keyword?
-   'map? 'map? 'nat-int? 'nat-int? 'neg-int? 'neg-int? 'nil? 'nil?
-   'number? 'number? 'pos-int? 'pos-int? 'seq? 'seq? 'sequential? 'sequential?
-   'set? 'set? 'string? 'string? 'symbol? 'symbol? 'vector? 'vector?})
+  "Predicate symbol -> symbolic malli schema (generator-capable, EDN-safe).
+   Derived from pred-table; entries in validate-only-preds validate but have
+   no generator."
+  (into {} (map (fn [[sym _]] [sym sym])) pred-table))
+
+(defn- core-sym?
+  "True when x is the symbol named sym-name, bare or qualified with
+   clojure.core / cljs.core (so clojure.core/some-fn and some-fn both match,
+   but my/some-fn does not). A non-symbol answers false instead of throwing."
+  [x sym-name]
+  (and (symbol? x) (= sym-name (name x))
+       (contains? #{nil "clojure.core" "cljs.core"} (namespace x))))
 
 (defn- pred-sym->schema
   "Upgrade a declared field predicate to its symbolic malli schema when known;
-   otherwise keep it as [:fn pred-sym] (validate-only, no generator)."
+   otherwise keep it as [:fn pred-sym] (validate-only, no generator).
+   Two structural rewrites at macroexpansion, only over table-covered preds:
+   (some-fn nil? p) -> [:maybe p], and (constantly true) -> :any."
   [pred-sym]
-  (get pred-sym->malli pred-sym [:fn pred-sym]))
+  (cond
+    (contains? pred-sym->malli pred-sym)
+    (get pred-sym->malli pred-sym)
+
+    (and (seq? pred-sym)
+         (core-sym? (first pred-sym) "some-fn")
+         (= 3 (count pred-sym))
+         (core-sym? (second pred-sym) "nil?")
+         (contains? pred-sym->malli (nth pred-sym 2)))
+    [:maybe (get pred-sym->malli (nth pred-sym 2))]
+
+    (and (seq? pred-sym)
+         (core-sym? (first pred-sym) "constantly")
+         (= 2 (count pred-sym))
+         (true? (second pred-sym)))
+    :any
+
+    :else
+    [:fn pred-sym]))
 
 (defn- variants->malli-form
   "Build the ONE malli :multi schema form (dispatch :adt/variant) for PARSED

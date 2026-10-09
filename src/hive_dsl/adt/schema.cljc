@@ -27,12 +27,9 @@
 (def pred->schema
   "Core predicate fn -> symbolic malli schema (generator-capable, EDN-safe).
    Runtime counterpart of hive-dsl.adt/pred-sym->malli (which works on symbols
-   at macroexpansion time; this table keys the evaluated fns)."
-  {any? 'any? boolean? 'boolean? double? 'double? float? 'float?
-   fn? 'fn? int? 'int? integer? 'integer? keyword? 'keyword?
-   map? 'map? nat-int? 'nat-int? neg-int? 'neg-int? nil? 'nil?
-   number? 'number? pos-int? 'pos-int? seq? 'seq? sequential? 'sequential?
-   set? 'set? string? 'string? symbol? 'symbol? vector? 'vector?})
+   at macroexpansion time; this table keys the evaluated fns).
+   Derived by inverting hive-dsl.adt/pred-table, the ONE source."
+  (into {} (map (fn [[sym f]] [f sym])) adt/pred-table))
 
 (defn variant->map-schema
   "A malli :map schema for one variant: the :adt/type and :adt/variant tag keys
