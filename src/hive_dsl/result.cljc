@@ -183,9 +183,12 @@
 (defn- host-catch-all
   "Catch class for a catch-everything handler, chosen for the EXPANSION host.
    'Throwable where the host has it, :default otherwise (ClojureScript and the
-   class-free native runtimes)."
+   class-free native runtimes). Basilisp needs a class in every catch, so it
+   takes python/Exception (BaseException would also trap KeyboardInterrupt and
+   SystemExit, which are cancellation signals, not failures)."
   [cljs?]
-  (if (or cljs? (nil? (resolve 'Throwable))) :default 'Throwable))
+  #?(:lpy     (if cljs? :default 'python/Exception)
+     :default (if (or cljs? (nil? (resolve 'Throwable))) :default 'Throwable)))
 
 (defn- host-meta-check
   "Form testing whether `sym` can carry metadata on the EXPANSION host.
@@ -302,9 +305,7 @@
   (let [cljs?      (boolean (:ns &env))
         e          (gensym "e")
         fb         (gensym "fb")
-        meta-check (if cljs?
-                     (list 'satisfies? 'cljs.core/IWithMeta fb)
-                     (list 'instance? 'clojure.lang.IObj fb))]
+        meta-check (host-meta-check cljs? fb)]
     `(try ~@body
           (catch ~catch-class ~e
             (let [~fb ~fallback]
@@ -350,7 +351,7 @@
   ([f fallback]
    (fn [& args]
      (try (apply f args)
-          (catch #?(:clj Throwable :cljs :default :default :default) _ fallback)))))
+          (catch #?(:clj Throwable :cljs :default :lpy python/Exception :default :default) _ fallback)))))
 
 (defn guard-fn
   "Like rescue-fn but catches a specific class. For selective pipelines.
@@ -359,13 +360,13 @@
    (map  (guard-fn IOException #(read %) :missing) items)
 
    Host-bound: `catch-class` is a host class and the dispatch goes through
-   `instance?`, so this needs a host with classes (JVM, ClojureWasm). Use
-   `rescue-fn` where the code must also run on a class-free runtime."
+   `instance?`, so this needs a host with classes (JVM, ClojureWasm, Basilisp).
+   Use `rescue-fn` where the code must also run on a class-free runtime."
   ([catch-class f] (guard-fn catch-class f nil))
   ([catch-class f fallback]
    (fn [& args]
      (try (apply f args)
-          (catch #?(:clj Throwable :cljs :default :default :default) t
+          (catch #?(:clj Throwable :cljs :default :lpy python/Exception :default :default) t
             (if (instance? catch-class t)
               fallback
               (throw t)))))))
@@ -437,12 +438,13 @@
    `fallback` WITHOUT logging. Other throwables fall through to
    `rescue-log` semantics (log + fallback).
 
-   On cljs there is no thread interruption — degrades to `rescue-log`.
+   On cljs and Basilisp there is no thread interruption — degrades to
+   `rescue-log`.
 
    (rescue-interrupt \"query-axioms-worker\" []
      (query-scoped-entries store q))"
   [label fallback & body]
-  (if (:ns &env)
+  (if (or (:ns &env) #?(:lpy true :default false))
     `(rescue-log ~label ~fallback ~@body)
     (let [e  (gensym "e")
           fb (gensym "fb")
