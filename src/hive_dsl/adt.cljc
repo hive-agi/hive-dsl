@@ -256,14 +256,26 @@
                     {:variant v}))))
 
 (defn- camel->kebab
-  "Convert CamelCase to kebab-case.
-   EventType → event-type
-   SpawnMode → spawn-mode"
+  "Convert CamelCase to kebab-case: EventType -> event-type, HTTPRequest ->
+   http-request. A character walk, not regex replacement: group references
+   (\"$1\") and fn replacements behave differently on Basilisp, whose
+   (get v -1) also answers the LAST element, hence the (pos? i) guard.
+   A hyphen goes before an upper-case char that follows a lower-case letter
+   or a digit, or that ends an acronym (upper-case, then lower-case): the two
+   rules of the regex version, and nothing after a separator."
   [s]
-  (-> s
-      (str/replace #"([a-z0-9])([A-Z])" "$1-$2")
-      (str/replace #"([A-Z]+)([A-Z][a-z])" "$1-$2")
-      str/lower-case))
+  (let [cs  (mapv str (str s))
+        up? (fn [c] (and c (not= c (str/lower-case c))))
+        lo? (fn [c] (and c (not= c (str/upper-case c))))
+        dg? (fn [c] (and c (contains? #{"0" "1" "2" "3" "4" "5" "6" "7" "8" "9"} c)))]
+    (str/lower-case
+     (apply str (map-indexed (fn [i c]
+                               (let [p (when (pos? i) (get cs (dec i))) q (get cs (inc i))]
+                                 (if (and (up? c) p
+                                          (or (lo? p) (dg? p) (and (up? p) (lo? q))))
+                                   (str "-" c)
+                                   c)))
+                             cs)))))
 
 (def pred-table
   "THE predicate table: core predicate symbol -> the evaluated predicate fn.
