@@ -12,6 +12,7 @@
   :value " 42 "},
  :identity/keys-nil ["coordinator"],
  :coerce/double-pad {:ok 1.5},
+ :result/ok->> {:ok 9},
  :identity/scope-global
  {:adt/variant :project/global, :adt/type :ProjectScope},
  :agentop/recover {:ok :fixed},
@@ -24,11 +25,14 @@
    :adt/variant (typed.clojure/Val :caller/named),
    :slave-id typed.clojure/Str}),
  :identity/caller-key "coordinator",
+ :adt/registered-missing false,
  :identity/caller-id? true,
+ :adt/adt? true,
  :result/rescue-nil nil,
  :result/bind {:ok 3},
  :agentop/fan-in-err :partial,
  :identity/keys-hex ["slave-7:3f9a0c1e" "slave-7"],
+ :adt/adt?-plain false,
  :identity/coordinator-str
  {:adt/variant :caller/coordinator, :adt/type :CallerId},
  :coerce/double-bad
@@ -40,27 +44,41 @@
  :coerce/enum-bad :coerce/invalid-enum,
  :coerce/enum-ok {:ok :both},
  :coerce/int-num {:ok 7},
+ :adt/coerce-keyword
+ {:adt/type :CallerId, :adt/variant :caller/coordinator},
  :identity/keys-digits ["coordinator:947426" "coordinator"],
  :agentop/retry-ok {:ok :first},
  :identity/scope? true,
+ :adt/case-named :named,
  :batch/normalize-map [{:a 1}],
  :identity/piggyback-global "slave-7",
  :coerce/double {:ok 1.5},
  :result/err {:error :boom, :a 1},
  :emit/pred-fn typed.clojure/Str,
  :identity/scope-string-nil nil,
+ :adt/registered true,
  :emit/pred-sym typed.clojure/Str,
+ :adt/type-variants #{:caller/coordinator :caller/named},
  :agentop/budget-out
  {:error :budget-exhausted, :budget/remaining 1, :budget/needed 3},
+ :result/ok->-bind {:ok 42},
+ :adt/coerce-keyword-bad nil,
  :adt/valid false,
  :identity/scope-scoped
  {:adt/variant :project/scoped,
   :adt/type :ProjectScope,
   :project-id "hive"},
+ :adt/type-variants-missing nil,
  :coerce/int {:ok 42},
+ :adt/data {:slave-id "slave-7"},
+ :adt/serialize-non-adt nil,
+ :adt/make-variant-enum
+ {:adt/type :CallerId, :adt/variant :caller/coordinator},
  :identity/coordinator
  {:adt/variant :caller/coordinator, :adt/type :CallerId},
  :identity/session-hex true,
+ :result/ok-> {:ok 30},
+ :result/ok->-short {:error :stop},
  :swarm/status? true,
  :result/rescue-ok 42,
  :result/try-effect :effect/exception,
@@ -69,30 +87,51 @@
  :result/let-ok-short {:error :stop},
  :result/ok? true,
  :identity/session-foreign false,
+ :adt/serialize
+ {:adt/variant :caller/named,
+  :adt/type :CallerId,
+  :slave-id "slave-7"},
+ :result/ensure-ok {:ok 5},
  :taxonomy/known-error false,
  :result/rescue-coll [],
  :conv/status? true,
+ :adt/deserialize-bad nil,
+ :adt/variant :caller/named,
  :identity/buffer-key ["slave-7" "hive"],
  :coerce/int-bad
  {:error :coerce/invalid-int,
   :message "Expected integer, got \"x\"",
   :value "x"},
+ :result/map-err-ok {:ok 1},
  :emit/pred-sym-map
  (typed.clojure/Map typed.clojure/Any typed.clojure/Any),
  :identity/buffer-key-global ["coordinator" "global"],
  :identity/keys-foreign ["hive:mcp"],
  :swarm/->status
  {:adt/variant :slave-status/working, :adt/type :SlaveStatus},
+ :adt/validate
+ {:adt/variant :caller/named,
+  :adt/type :CallerId,
+  :slave-id "slave-7"},
+ :result/ok->>-err {:error :e},
  :identity/piggyback "slave-7-hive",
  :result/ok {:ok 1},
  :result/rescue-log :fb,
  :coerce/boolean {:ok true},
  :identity/scope-string "hive",
+ :adt/validate-type
+ {:portable-cases/threw
+  "Type mismatch: expected :CallerId, got :ProjectScope"},
  :resource/scope-acq {:ok :db},
+ :result/map-err {:error :e, :a 1, :seen true},
  :swarm/->status-bad nil,
+ :adt/case-coordinator :coordinator,
+ :adt/make-variant
+ {:adt/type :CallerId, :adt/variant :caller/named, :slave-id "s"},
  :emit/adt-union-missing
  {:portable-cases/threw
   "adt-union: ADT type not registered: :NoSuchAdtType"},
+ :adt/variant-non-map nil,
  :result/rescue-fn :fb,
  :coerce/keyword {:ok :abc},
  :identity/named
@@ -100,6 +139,9 @@
   :adt/type :CallerId,
   :slave-id "slave-7"},
  :result/rescue-meta "boom",
+ :result/ensure-plain {:ok 5},
+ :adt/deserialize
+ {:adt/type :CallerId, :adt/variant :caller/coordinator},
  :result/let-ok {:ok 6},
  :agentop/budget-ok {:ok :ran},
  :coerce/vec-csv
@@ -109,6 +151,8 @@
  :swarm/status
  {:adt/variant :slave-status/zombie, :adt/type :SlaveStatus},
  :result/map-ok-err {:error :e},
+ :adt/make-variant-empty
+ {:adt/type :CallerId, :adt/variant :caller/coordinator},
  :identity/keys-no-colon ["slave-7"],
  :identity/caller-string "slave-7",
  :adt/type :Foo,
@@ -116,6 +160,7 @@
  :emit/pred-unknown typed.clojure/Any,
  :agentop/fan-in-ok {:ok [1 2]},
  :agentop/tap {:ok 1},
+ :result/ensure-err {:error :e},
  :emit/adt-union
  (typed.clojure/U
   (typed.clojure/HMap
@@ -127,5 +172,7 @@
    {:adt/type (typed.clojure/Val :CallerId),
     :adt/variant (typed.clojure/Val :caller/named),
     :slave-id typed.clojure/Str})),
+ :adt/validate-field
+ {:portable-cases/threw "Schema validation failed"},
  :batch/count 0}
 ))
