@@ -108,7 +108,51 @@
    [:emit/pred-unknown        #(te/pred-type 'no-such-pred?)]
    [:emit/variant-hmap        #(te/variant-hmap :CallerId :caller/named)]
    [:emit/adt-union           #(te/adt-union :CallerId)]
-   [:emit/adt-union-missing   #(te/adt-union :NoSuchAdtType)]])
+   [:emit/adt-union-missing   #(te/adt-union :NoSuchAdtType)]
+   ;; result — map-err, ensure-result and the smart-wrapping threads
+   [:result/map-err           #(r/map-err (r/err :e {:a 1}) (fn [e] (assoc e :seen true)))]
+   [:result/map-err-ok        #(r/map-err (r/ok 1) (fn [_] :never))]
+   [:result/ensure-plain      #(r/ensure-result 5)]
+   [:result/ensure-ok         #(r/ensure-result (r/ok 5))]
+   [:result/ensure-err        #(r/ensure-result (r/err :e {}))]
+   [:result/ok->              #(r/ok-> 2 inc (* 10))]
+   [:result/ok->-bind         #(r/ok-> (r/ok 2) ((fn [x] (r/ok (+ x 40)))))]
+   [:result/ok->-short        #(r/ok-> (r/ok 2) ((fn [_] (r/err :stop {}))) inc)]
+   [:result/ok->>             #(r/ok->> (r/ok [1 2 3]) (map inc) (reduce +))]
+   [:result/ok->>-err         #(r/ok->> (r/err :e {}) (map inc))]
+   ;; adt — registry reads, value ops, construction, serialization,
+   ;; validation and the exhaustive match, over the registered CallerId sum.
+   ;; register-type! / registered-types are left out: the first mutates the
+   ;; shared registry, the second returns schema fns, not comparable data.
+   [:adt/registered           #(adt/type-registered? :CallerId)]
+   [:adt/registered-missing   #(adt/type-registered? :NoSuchAdtType)]
+   [:adt/type-variants        #(adt/type-variants :CallerId)]
+   [:adt/type-variants-missing #(adt/type-variants :NoSuchAdtType)]
+   [:adt/variant              #(adt/adt-variant (ci/parse-caller-id "slave-7"))]
+   [:adt/variant-non-map      #(adt/adt-variant :not-a-map)]
+   [:adt/adt?                 #(adt/adt? (ci/parse-caller-id nil))]
+   [:adt/adt?-plain           #(adt/adt? {:adt/type :CallerId})]
+   [:adt/data                 #(adt/adt-data (ci/parse-caller-id "slave-7"))]
+   [:adt/make-variant         #(adt/make-variant :CallerId :caller/named {:slave-id "s"})]
+   [:adt/make-variant-enum    #(adt/make-variant :CallerId :caller/coordinator)]
+   [:adt/make-variant-empty   #(adt/make-variant :CallerId :caller/coordinator {})]
+   [:adt/coerce-keyword       #(adt/coerce-keyword :CallerId :caller/coordinator)]
+   [:adt/coerce-keyword-bad   #(adt/coerce-keyword :CallerId :caller/nope)]
+   [:adt/serialize            #(adt/serialize (ci/parse-caller-id "slave-7"))]
+   [:adt/serialize-non-adt    #(adt/serialize {:a 1})]
+   [:adt/deserialize          #(adt/deserialize {:adt/type :CallerId :adt/variant :caller/coordinator})]
+   [:adt/deserialize-bad      #(adt/deserialize {:adt/type :CallerId :adt/variant :caller/nope})]
+   [:adt/validate             #(adt/validate ci/CallerId (ci/parse-caller-id "slave-7"))]
+   [:adt/validate-field       #(adt/validate ci/CallerId {:adt/type :CallerId
+                                                          :adt/variant :caller/named
+                                                          :slave-id 7})]
+   [:adt/validate-type        #(adt/validate ci/CallerId (ci/parse-project-scope nil))]
+   [:adt/case-coordinator     #(adt/adt-case ci/CallerId (ci/parse-caller-id nil)
+                                             :caller/coordinator :coordinator
+                                             :caller/named       :named)]
+   [:adt/case-named           #(adt/adt-case ci/CallerId (ci/parse-caller-id "slave-7")
+                                             :caller/coordinator :coordinator
+                                             :caller/named       :named)]])
 
 (defn observe
   "Run every case, returning {id value}. A throwing thunk records
