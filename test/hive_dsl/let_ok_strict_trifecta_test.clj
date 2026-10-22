@@ -13,8 +13,7 @@
    reintroducing the loose `(if (ok? r#) ... r#)` shape. The mutation
    `swallow-throw` is *exactly* the pre-strict behavior; if it ever
    stops being caught, the bug is back."
-  (:require [clojure.test :refer [use-fixtures]]
-            [clojure.test.check.generators :as gen]
+  (:require [clojure.test.check.generators :as gen]
             [hive-dsl.result :as r]
             [hive-test.trifecta :refer [deftrifecta]]))
 

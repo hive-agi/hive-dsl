@@ -10,11 +10,9 @@
    - P5: LRU preserves recent — most recently accessed survives eviction
    - P6: FIFO evicts oldest — first inserted evicted first on overflow
    - P7: Put/get roundtrip — bget after bput returns same data"
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.test.check :as tc]
+  (:require [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [clojure.test.check.clojure-test :refer [defspec]]
             [hive-dsl.bounded-atom :as ba]
             [hive-test.generators.bounded-atom :as gen-ba]
             [hive-test.properties.bounded-atom :as prop-ba]))

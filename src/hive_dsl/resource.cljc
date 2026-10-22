@@ -40,7 +40,7 @@
                (try (close-db! conn) (catch Throwable _)))))
          acquired))"
   [[sym acquire-expr] & body]
-  (let [[release-kw release-fn & rest-body]
+  (let [[_release-kw release-fn & rest-body]
         (if (= :release (first body))
           body
           (throw (ex-info "with-resource requires :release keyword after binding"

@@ -1,9 +1,9 @@
 (ns hive-dsl.rescue-family-trifecta-test
   "Trifecta coverage for the rescue family: rescue, rescue-log, rescue-ex, rescue-ex-log."
-  (:require [clojure.test :refer [use-fixtures deftest is]]
+  (:require [clojure.test :refer [deftest is]]
+            [clojure.test.check.clojure-test :as tc]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [clojure.test.check.clojure-test :as tc]
             [hive-dsl.result :as r]
             [hive-dsl.result.spec]
             [hive-test.trifecta :refer [deftrifecta]]))

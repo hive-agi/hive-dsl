@@ -228,7 +228,7 @@
       ;; The body exception should propagate, not be masked by stop! failure
       (is (thrown-with-msg?
             Exception #"body error"
-            (lc/with-lifecycle [r bad-resource]
+            (lc/with-lifecycle [_r bad-resource]
               (throw (Exception. "body error"))))))))
 
 ;; =============================================================================

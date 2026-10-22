@@ -2,7 +2,8 @@
   "Unit tests for hive-dsl.adt — defadt macro, constructors, predicates,
    coercion, serialization, validation, and exhaustive pattern matching."
   (:require [clojure.test :refer [deftest is testing]]
-            [hive-dsl.adt :as adt]))
+            [hive-dsl.adt :as adt]
+            [clojure.edn]))
 
 ;; =============================================================================
 ;; Test ADT Definitions

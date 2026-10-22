@@ -54,10 +54,10 @@
 
 (deftest batch-flush-empty-test
   (testing "batch-flush! returns :batch/empty when no data"
-    (let [b (batch/tx-batch :conn (fn [_ _]))]
-      (let [result (batch/batch-flush! b)]
-        (is (r/err? result))
-        (is (= :batch/empty (:error result)))))))
+    (let [b (batch/tx-batch :conn (fn [_ _]))
+          result (batch/batch-flush! b)]
+      (is (r/err? result))
+      (is (= :batch/empty (:error result))))))
 
 (deftest batch-flush-exception-test
   (testing "batch-flush! catches exceptions and returns err"
@@ -123,7 +123,7 @@
 
 (deftest with-batch-empty-body-test
   (testing "with-batch with no adds returns :batch/empty"
-    (let [result (batch/with-batch [b (batch/tx-batch :conn (fn [_ _]))]
+    (let [result (batch/with-batch [_b (batch/tx-batch :conn (fn [_ _]))]
                    nil)]
       (is (r/err? result))
       (is (= :batch/empty (:error result))))))

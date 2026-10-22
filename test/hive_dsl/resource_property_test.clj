@@ -1,13 +1,11 @@
 (ns hive-dsl.resource-property-test
   "Property-based tests for resource lifecycle macros.
    Verifies cleanup totality and LIFO ordering invariants."
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.test.check :as tc]
+  (:require [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [clojure.test.check.clojure-test :refer [defspec]]
-            [hive-dsl.result :as r]
-            [hive-dsl.resource :as res]))
+            [hive-dsl.resource :as res]
+            [hive-dsl.result :as r]))
 
 ;; =============================================================================
 ;; P1: Cleanup totality — release ALWAYS runs for ok? acquires
@@ -18,8 +16,8 @@
                  throw? gen/boolean]
                 (let [released (atom false)
                       release-fn (fn [_] (reset! released true))
-                      result (try
-                               (res/with-resource [r (r/ok value)]
+                      _result (try
+                               (res/with-resource [_r (r/ok value)]
                                  :release release-fn
                                  (if throw?
                                    (throw (Exception. "test"))
@@ -35,7 +33,7 @@
 (defspec p2-no-release-on-acquire-failure 100
   (prop/for-all [category gen/keyword]
                 (let [released (atom false)
-                      result (res/with-resource [r (r/err category)]
+                      result (res/with-resource [_r (r/err category)]
                                :release (fn [_] (reset! released true))
                                (r/ok :unreachable))]
                   (and (r/err? result)
