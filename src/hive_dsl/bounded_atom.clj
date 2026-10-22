@@ -218,7 +218,7 @@
       :name     \"my-store\"}     ;; optional name for observability"
   [{:keys [max-entries ttl-ms eviction-policy on-evict on-sweep name]
     :or {eviction-policy :lru}
-    :as opts}]
+    :as #_{:clj-kondo/ignore [:unused-binding]} opts}]
   (assert (pos-int? max-entries) "max-entries must be a positive integer")
   (assert (#{:lru :fifo :ttl} eviction-policy)
           (str "eviction-policy must be :lru, :fifo, or :ttl — got " eviction-policy))

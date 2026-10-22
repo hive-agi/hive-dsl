@@ -1,7 +1,6 @@
 (ns hive-dsl.result.agentop-property-test
   "Property-based tests for hive-dsl.result.agentop."
   (:require [clojure.test :refer [deftest is]]
-            [clojure.test.check :as tc]
             [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]

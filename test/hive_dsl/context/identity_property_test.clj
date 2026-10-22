@@ -1,13 +1,12 @@
 (ns hive-dsl.context.identity-property-test
   "Property tests for context identity ADTs."
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.test.check :as tc]
+  (:require [clojure.string :as str]
+            [clojure.test :refer [deftest is]]
+            [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [clojure.test.check.clojure-test :refer [defspec]]
-            [hive-dsl.context.identity :as ctx-id]
             [hive-dsl.adt :as adt]
-            [clojure.string :as str]))
+            [hive-dsl.context.identity :as ctx-id]))
 
 ;; =============================================================================
 ;; Generators (inline for hive-dsl test isolation)

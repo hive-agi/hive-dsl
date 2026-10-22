@@ -335,7 +335,7 @@
 (deftest e2e-let-ok-short-circuit-skips-effects
   (testing "let-ok short-circuit prevents side effects in later steps"
     (let [call-log (atom [])
-          result   (r/let-ok [a (do (swap! call-log conj :step-a) (r/ok 10))
+          result   (r/let-ok [_a (do (swap! call-log conj :step-a) (r/ok 10))
                               _b (do (swap! call-log conj :step-b) (r/err :test/fail))
                               _c (do (swap! call-log conj :step-c) (r/ok 99))]
                              (r/ok :unreachable))]
@@ -545,10 +545,10 @@
                     (let [r (f)]
                       (if (or (r/ok? r) (>= n max-retries))
                         r
-                        (recur (inc n))))))]
-      (let [result (retry flaky-op 5)]
-        (is (r/ok? result))
-        (is (= 3 (get-in result [:ok :attempts])))))))
+                        (recur (inc n))))))
+          result (retry flaky-op 5)]
+      (is (r/ok? result))
+      (is (= 3 (get-in result [:ok :attempts]))))))
 
 (deftest e2e-pipeline-with-logging-side-effects
   (testing "Pipeline with side-effects tracked via atom (mimics logging)"

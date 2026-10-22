@@ -1,10 +1,9 @@
 (ns hive-dsl.batch-property-test
   "Property-based tests for normalize-tx-datum.
    Verifies totality, idempotency, and structural invariants."
-  (:require [clojure.test :refer [deftest testing is]]
+  (:require [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [clojure.test.check.clojure-test :refer [defspec]]
             [hive-dsl.batch :as batch]
             [hive-test.properties :as props]))
 

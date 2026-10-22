@@ -10,11 +10,11 @@
    6. ADT laws: make-variant produces adt? values
 
    Convention: 200 iterations per defspec, *_property_test.clj naming."
-  (:require [clojure.test :refer [deftest is testing]]
-            [clojure.test.check.clojure-test :refer [defspec]]
+  (:require [clojure.test.check.clojure-test :refer [defspec]]
             [clojure.test.check.generators :as gen]
             [clojure.test.check.properties :as prop]
-            [hive-dsl.adt :as adt]))
+            [hive-dsl.adt :as adt]
+            [clojure.edn]))
 
 ;; =============================================================================
 ;; Test ADT Definitions
@@ -298,7 +298,7 @@
                 (nil? (adt/deserialize {:adt/variant kw}))))
 
 (defspec deserialize-rejects-missing-variant 200
-  (prop/for-all [kw gen-direction-variant]
+  (prop/for-all [_kw gen-direction-variant]
                 (nil? (adt/deserialize {:adt/type :TestDirection}))))
 
 (defspec deserialize-rejects-wrong-variant 200

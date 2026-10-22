@@ -3,4 +3,18 @@
 ;; the classpath into .clj-kondo/imports/io.github.hive-agi/<lib>/ and the repo
 ;; lints through THAT copy, so a hook added to the export is invisible here.
 ;; See [[20260821212413-74f930de]].
-{:config-paths ["../resources/clj-kondo.exports/io.github.hive-agi/hive-dsl"]}
+;;
+;; Everything below is repo-local lint policy and stays OUT of the export, so
+;; consumers' own linting is untouched:
+;; - :cljc :features — hive-dsl's .cljc targets are JVM, cljw and cljrs, not
+;;   ClojureScript; kondo models only :clj/:cljs, so the :cljs pass reported
+;;   JVM interop (Throwable, Thread/sleep) that never runs on cljs.
+;; - typed.clojure — the gated rung-3 surface (hive-dsl.typed.*, typed
+;;   fixtures) uses t/defalias and t/ann, which kondo has no config for.
+;; - test/golden — EDN golden data (namespaced keys like :rescue/a/b that
+;;   kondo rejects), read by the trifecta tests, not source.
+{:config-paths ["../resources/clj-kondo.exports/io.github.hive-agi/hive-dsl"]
+ :cljc {:features #{:clj}}
+ :exclude-files "test/golden/"
+ :lint-as {typed.clojure/defalias clojure.core/def}
+ :linters {:unresolved-symbol {:exclude [(typed.clojure/ann)]}}}
