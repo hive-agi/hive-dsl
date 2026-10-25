@@ -224,7 +224,7 @@
 
 (deftest with-go-loop-returns-body-value-test
   (testing "with-go-loop returns the body's value"
-    (let [result (mc/with-go-loop [gl (fn [_msg]) {:buf-size 10}]
+    (let [result (mc/with-go-loop [_gl (fn [_msg]) {:buf-size 10}]
                    :body-result)]
       (is (= :body-result result)))))
 

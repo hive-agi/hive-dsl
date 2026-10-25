@@ -1,5 +1,5 @@
 (ns hive-dsl.result-test
-  (:require [clojure.test :refer [deftest testing is are]]
+  (:require [clojure.test :refer [deftest testing is]]
             [hive-dsl.result :as r]
             [hive-dsl.result.taxonomy :as tax]))
 
@@ -113,7 +113,7 @@
                       :let [y (* x x)]]
                      (r/ok y)))))
   (testing ":let with non-vector bindings is rejected at macroexpansion"
-    (let [raw   (try (macroexpand-1 '(hive-dsl.result/let-ok [:let foo] (r/ok :nope)))
+    (let [raw   (try #_{:clj-kondo/ignore [:unused-value]} (macroexpand-1 '(hive-dsl.result/let-ok [:let foo] (r/ok :nope)))
                      nil
                      (catch Throwable e e))
           cause (if (instance? clojure.lang.Compiler$CompilerException raw)

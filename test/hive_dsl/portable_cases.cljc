@@ -26,7 +26,7 @@
    [:result/ok?           #(r/ok? (r/ok 1))]
    [:result/err?          #(r/err? (r/err :boom {}))]
    [:result/let-ok        #(r/let-ok [x (r/ok 2) y (r/ok 3)] (r/ok (* x y)))]
-   [:result/let-ok-short  #(r/let-ok [x (r/err :stop {}) y (r/ok 3)] (r/ok y))]
+   [:result/let-ok-short  #(r/let-ok [_x (r/err :stop {}) y (r/ok 3)] (r/ok y))]
    [:result/map-ok        #(r/map-ok (r/ok 2) inc)]
    [:result/map-ok-err    #(r/map-ok (r/err :e {}) inc)]
    [:result/bind          #(r/bind (r/ok 2) (fn [v] (r/ok (inc v))))]

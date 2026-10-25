@@ -1,8 +1,8 @@
 (ns hive-dsl.context.identity-test
   "Unit tests for context identity ADTs."
-  (:require [clojure.test :refer [deftest testing is are]]
-            [hive-dsl.context.identity :as ctx-id]
-            [hive-dsl.adt :as adt]))
+  (:require [clojure.test :refer [deftest testing is]]
+            [hive-dsl.adt :as adt]
+            [hive-dsl.context.identity :as ctx-id]))
 
 ;; =============================================================================
 ;; Constructor Tests

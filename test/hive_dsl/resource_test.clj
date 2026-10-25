@@ -10,7 +10,7 @@
 (deftest with-resource-ok-path-test
   (testing "with-resource returns body result on success"
     (let [released (atom false)
-          result (res/with-resource [conn (r/ok :my-conn)]
+          result (res/with-resource [_conn (r/ok :my-conn)]
                    :release (fn [_] (reset! released true))
                    (r/ok {:data "processed"}))]
       (is (r/ok? result))
@@ -20,7 +20,7 @@
 (deftest with-resource-acquire-failure-test
   (testing "with-resource short-circuits on acquire error"
     (let [released (atom false)
-          result (res/with-resource [conn (r/err :resource/acquire-failed {:msg "no db"})]
+          result (res/with-resource [_conn (r/err :resource/acquire-failed {:msg "no db"})]
                    :release (fn [_] (reset! released true))
                    (r/ok :should-not-reach))]
       (is (r/err? result))
@@ -31,14 +31,14 @@
   (testing "with-resource runs release even when body throws"
     (let [released (atom false)]
       (is (thrown? Exception
-                   (res/with-resource [conn (r/ok :my-conn)]
+                   (res/with-resource [_conn (r/ok :my-conn)]
                      :release (fn [_] (reset! released true))
                      (throw (Exception. "boom")))))
       (is @released "release must run even on exception"))))
 
 (deftest with-resource-release-error-swallowed-test
   (testing "with-resource swallows release errors"
-    (let [result (res/with-resource [conn (r/ok :my-conn)]
+    (let [result (res/with-resource [_conn (r/ok :my-conn)]
                    :release (fn [_] (throw (Exception. "release failed")))
                    (r/ok :done))]
       (is (r/ok? result))
@@ -59,9 +59,9 @@
 (deftest with-resource-let-ok-short-circuit-test
   (testing "with-resource cleans up when let-ok short-circuits"
     (let [released (atom false)
-          result (res/with-resource [conn (r/ok :conn)]
+          result (res/with-resource [_conn (r/ok :conn)]
                    :release (fn [_] (reset! released true))
-                   (r/let-ok [x (r/err :io/timeout {:msg "slow"})]
+                   (r/let-ok [_x (r/err :io/timeout {:msg "slow"})]
                              (r/ok :unreachable)))]
       (is (r/err? result))
       (is (= :io/timeout (:error result)))
@@ -76,7 +76,7 @@
     (let [cleanup-log (atom [])
           result (res/with-scope [scope]
                    (res/scope-acquire! scope
-                                       (fn [r] (swap! cleanup-log conj :db-closed) nil)
+                                       (fn [_r] (swap! cleanup-log conj :db-closed) nil)
                                        (fn [config] (r/ok {:db config}))
                                        ["test-config"])
                    (r/ok :done))]
