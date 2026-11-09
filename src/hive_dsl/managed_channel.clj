@@ -78,7 +78,8 @@
                       {:name (:name opts) :state @state})))
     (async/<!! @channel)))
 
-(defn managed-go-loop
+(defn ^{:malli/schema '[:=> [:cat ifn? [:maybe :map]] [:map [:handler-fn ifn?] [:opts :map] [:state :some]]]}
+  managed-go-loop
   "Create a lifecycle-managed go-loop that consumes from a channel.
    Implements Lifecycle protocol. stop! closes the channel, which
    terminates the go-loop (it reads nil and exits).
@@ -129,14 +130,15 @@
       (reset! state :stopped))
     this))
 
-(defn managed-pub-sub
+(defn ^{:malli/schema '[:=> [:cat ifn? [:maybe :map]] [:map [:topic-fn ifn?] [:opts :map] [:state :some]]]}
+  managed-pub-sub
   "Lifecycle-managed pub/sub. publish! sends to topic, subscribe! returns
    a channel for a topic. stop! closes all channels.
    opts: {:buf-size 100 :name \"events\"}"
   [topic-fn opts]
   (->ManagedPubSub topic-fn (or opts {}) (atom :stopped) (atom nil) (atom nil) (atom {})))
 
-(defn publish!
+(defn ^{:malli/schema '[:=> [:cat [:map [:state :some] [:pub-channel :some]] :some] :boolean]} publish!
   "Publish a message to the pub/sub. The message is put on the input
    channel; the pub routes it to matching subscribers via topic-fn."
   [managed-ps msg]
@@ -146,7 +148,10 @@
                      :state @(:state managed-ps)})))
   (async/>!! @(:pub-channel managed-ps) msg))
 
-(defn subscribe!
+(defn ^{:malli/schema '[:function
+                        [:=> [:cat [:map [:state :some] [:pub :some] [:subs :some]] :any] :some]
+                        [:=> [:cat [:map [:state :some] [:pub :some] [:subs :some]] :any pos-int?] :some]]}
+  subscribe!
   "Subscribe to a topic. Returns a core.async channel that receives
    messages matching the topic. The channel is tracked for lifecycle cleanup."
   ([managed-ps topic] (subscribe! managed-ps topic 100))
@@ -194,7 +199,9 @@
 ;; fresh-channels! -- channel-per-lifecycle start pattern
 ;; =============================================================================
 
-(defn fresh-channels!
+(defn ^{:malli/schema '[:=> [:cat [:map-of :any [:maybe [:map [:buf {:optional true} pos-int?]]]]]
+                        [:map-of :any :some]]}
+  fresh-channels!
   "Create fresh channels for a lifecycle start. Returns map of name->chan.
    On stop, call (close-channels! result) to close all channels.
 
@@ -210,7 +217,7 @@
     {}
     channel-specs))
 
-(defn close-channels!
+(defn ^{:malli/schema '[:=> [:cat [:maybe [:map-of :any :any]]] :nil]} close-channels!
   "Close all channels in a channel map (as returned by fresh-channels!).
    Idempotent -- safe to call on already-closed channels."
   [channel-map]
