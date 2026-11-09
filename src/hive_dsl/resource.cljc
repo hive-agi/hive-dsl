@@ -59,13 +59,16 @@
 ;; with-scope — Multi-resource LIFO cleanup
 ;; =============================================================================
 
-(defn new-scope
+(defn ^{:malli/schema '[:=> [:cat] :some]} new-scope
   "Create a new resource scope. Returns an atom holding a stack of
    [resource cleanup-fn] pairs."
   []
   (atom []))
 
-(defn scope-acquire!
+(defn ^{:malli/schema '[:function
+                        [:=> [:cat :some ifn? [:sequential :any]] :any]
+                        [:=> [:cat :some [:maybe ifn?] ifn? [:sequential :any]] :any]]}
+  scope-acquire!
   "Acquire a resource within a scope. Applies acquire-fn to args (a vector),
    which must return a Result. On ok, pushes [resource cleanup-fn] onto the
    scope stack and returns the Result. On err, returns the error. cleanup-fn
@@ -84,7 +87,8 @@
          result)
        result))))
 
-(defn scope-release!
+(defn ^{:malli/schema '[:=> [:cat :some] [:vector [:map [:resource :any] [:error [:maybe :string]]]]]}
+  scope-release!
   "Release all resources in a scope in LIFO order.
    Errors during cleanup are collected but do not stop the sweep.
    Returns vector of any cleanup errors (empty on success)."

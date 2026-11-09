@@ -28,27 +28,34 @@
 ;; Pure Projections
 ;; =============================================================================
 
-(defn caller-id-string
+(defn ^{:malli/schema '[:=> [:cat [:map [:adt/type [:= :CallerId]] [:adt/variant :keyword]]] :string]}
+  caller-id-string
   "Extract the raw string from a CallerId ADT."
   [caller-id]
   (adt-case CallerId caller-id
             :caller/coordinator "coordinator"
             :caller/named       (:slave-id caller-id)))
 
-(defn project-scope-string
+(defn ^{:malli/schema '[:=> [:cat [:map [:adt/type [:= :ProjectScope]] [:adt/variant :keyword]]]
+                        [:maybe :string]]}
+  project-scope-string
   "Extract the raw string from a ProjectScope ADT (nil for global)."
   [project-scope]
   (adt-case ProjectScope project-scope
             :project/global nil
             :project/scoped (:project-id project-scope)))
 
-(defn caller-id-key
+(defn ^{:malli/schema '[:=> [:cat [:map [:adt/type [:= :CallerId]] [:adt/variant :keyword]]] :string]}
+  caller-id-key
   "Derive session-scoped buffer key from caller only.
    For piggyback channels where one session = one project."
   [cid]
   (caller-id-string cid))
 
-(defn make-buffer-key
+(defn ^{:malli/schema '[:=> [:cat [:map [:adt/type [:= :CallerId]] [:adt/variant :keyword]]
+                             [:map [:adt/type [:= :ProjectScope]] [:adt/variant :keyword]]]
+                        [:tuple :string :string]]}
+  make-buffer-key
   "Derive buffer key vector from caller + scope.
    Canonical key for ALL channel buffers."
   [cid pscope]
@@ -57,7 +64,10 @@
              :project/global  "global"
              :project/scoped  (:project-id pscope))])
 
-(defn make-piggyback-agent-id
+(defn ^{:malli/schema '[:=> [:cat [:map [:adt/type [:= :CallerId]] [:adt/variant :keyword]]
+                             [:map [:adt/type [:= :ProjectScope]] [:adt/variant :keyword]]]
+                        :string]}
+  make-piggyback-agent-id
   "Derive piggyback agent ID string from caller + scope.
    Used for scoped piggyback channel identification."
   [cid pscope]
@@ -70,7 +80,9 @@
 ;; Boundary Coercion
 ;; =============================================================================
 
-(defn parse-caller-id
+(defn ^{:malli/schema '[:=> [:cat [:maybe :string]]
+                        [:map [:adt/type [:= :CallerId]] [:adt/variant :keyword]]]}
+  parse-caller-id
   "Coerce raw _caller_id string to CallerId ADT.
    nil or \"coordinator\" → :caller/coordinator."
   [raw]
@@ -78,7 +90,9 @@
     (caller-id :caller/named {:slave-id raw})
     (caller-id :caller/coordinator)))
 
-(defn parse-project-scope
+(defn ^{:malli/schema '[:=> [:cat [:maybe :string]]
+                        [:map [:adt/type [:= :ProjectScope]] [:adt/variant :keyword]]]}
+  parse-project-scope
   "Coerce raw project-id string to ProjectScope ADT.
    nil → :project/global."
   [raw]
@@ -94,7 +108,7 @@
 
 (def ^:private lower-hex-digit? (set "0123456789abcdef"))
 
-(defn session-id-shape?
+(defn ^{:malli/schema '[:=> [:cat :any] :boolean]} session-id-shape?
   "True when `s` has the shape of a bb-mcp session id (bb-mcp.host.port/session-id):
    one or more decimal digits (a process id, as exported in BB_MCP_SESSION_ID
    or read by the bb host), or exactly eight lowercase hex digits (the random
@@ -108,7 +122,8 @@
             (and (= 8 (count s))
                  (every? lower-hex-digit? s))))))
 
-(defn caller-id-lookup-keys
+(defn ^{:malli/schema '[:=> [:cat [:maybe :string]] [:vector {:min 1 :max 2} :string]]}
+  caller-id-lookup-keys
   "Ordered lookup keys for a raw _caller_id, as a vector of one or two strings.
 
    First the canonical caller id string (nil and \"coordinator\" canonicalise

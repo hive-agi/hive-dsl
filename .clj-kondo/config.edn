@@ -13,8 +13,11 @@
 ;;   fixtures) uses t/defalias and t/ann, which kondo has no config for.
 ;; - test/golden — EDN golden data (namespaced keys like :rescue/a/b that
 ;;   kondo rejects), read by the trifecta tests, not source.
+;; - hive-schemas.coverage/deftest-contract-coverage — emits a deftest; it
+;;   ships no kondo export of its own.
 {:config-paths ["../resources/clj-kondo.exports/io.github.hive-agi/hive-dsl"]
  :cljc {:features #{:clj}}
  :exclude-files "test/golden/"
- :lint-as {typed.clojure/defalias clojure.core/def}
+ :lint-as {typed.clojure/defalias clojure.core/def
+           hive-schemas.coverage/deftest-contract-coverage clojure.core/def}
  :linters {:unresolved-symbol {:exclude [(typed.clojure/ann)]}}}
