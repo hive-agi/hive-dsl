@@ -63,7 +63,7 @@
                   [f ty])))
         sym->type))
 
-(defn pred-type
+(defn ^{:malli/schema '[:=> [:cat :any] [:or :symbol [:sequential :any]]]} pred-type
   "Typed Clojure syntax for one variant-schema predicate: accepts the fn
    object or its symbol. Unknown predicates widen to typed.clojure/Any."
   [pred]
@@ -71,7 +71,7 @@
       (get fn->type pred)
       'typed.clojure/Any))
 
-(defn variant-hmap
+(defn ^{:malli/schema '[:=> [:cat :keyword :keyword] [:sequential :any]]} variant-hmap
   "HMap syntax for `variant-kw` of the registered ADT `type-kw`:
    :adt/type + :adt/variant Val keys plus one entry per schema field."
   [type-kw variant-kw]
@@ -82,7 +82,7 @@
                 (map (fn [[field pred]] [field (pred-type pred)]))
                 schema))))
 
-(defn adt-union
+(defn ^{:malli/schema '[:=> [:cat :keyword] [:sequential :any]]} adt-union
   "Per-variant HMap union syntax for the registered ADT `type-kw`, variants
    in sorted order. Throws ex-info when the type is not registered."
   [type-kw]

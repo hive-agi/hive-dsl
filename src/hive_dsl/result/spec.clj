@@ -183,7 +183,7 @@
 ;; but are excluded from instrument!/unstrument! — macros expand at
 ;; compile time and cannot be wrapped at runtime by stest/instrument.
 
-(defn instrument!
+(defn ^{:malli/schema '[:=> [:cat] [:sequential :symbol]]} instrument!
   "Enable spec checking on all Result DSL functions.
    Use in dev/test, not production (performance cost).
    Note: macros (let-ok, try-effect, try-effect*) have fdef specs
@@ -194,7 +194,7 @@
    [`r/ok `r/err `r/ok? `r/err? `r/bind `r/map-ok `r/map-err
     `tax/known-error?]))
 
-(defn unstrument!
+(defn ^{:malli/schema '[:=> [:cat] [:sequential :symbol]]} unstrument!
   "Disable spec checking (restore production performance)."
   []
   (require '[clojure.spec.test.alpha :as stest])

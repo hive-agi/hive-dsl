@@ -50,7 +50,9 @@
 
 (alter-meta! (var registry) assoc :private true)
 
-(defn register-type!
+(defn ^{:malli/schema '[:=> [:cat :keyword [:map [:variants [:set :keyword]]]]
+                        [:map-of :keyword :map]]}
+  register-type!
   "Register an ADT type with its variant set and schemas.
    Called by defadt macro — not for direct use.
 
@@ -78,17 +80,17 @@
                        :only-in-redeclared (set/difference (set variants) (set prior-variants))})))
     (swap! registry assoc type-kw type-meta)))
 
-(defn registered-types
+(defn ^{:malli/schema '[:=> [:cat] [:map-of :keyword :map]]} registered-types
   "Return the map of all registered ADT types."
   []
   @registry)
 
-(defn type-registered?
+(defn ^{:malli/schema '[:=> [:cat :any] :boolean]} type-registered?
   "True if the given type keyword is registered."
   [type-kw]
   (contains? @registry type-kw))
 
-(defn type-variants
+(defn ^{:malli/schema '[:=> [:cat :any] [:maybe [:set :keyword]]]} type-variants
   "Return the set of variant keywords for a registered type.
    Returns nil if type is not registered."
   [type-kw]
@@ -98,24 +100,24 @@
 ;; ADT Value Operations
 ;; =============================================================================
 
-(defn adt-type
+(defn ^{:malli/schema '[:=> [:cat :any] :any]} adt-type
   "Extract the type keyword from an ADT value."
   [x]
   (when (map? x) (:adt/type x)))
 
-(defn adt-variant
+(defn ^{:malli/schema '[:=> [:cat :any] :any]} adt-variant
   "Extract the variant keyword from an ADT value."
   [x]
   (when (map? x) (:adt/variant x)))
 
-(defn adt?
+(defn ^{:malli/schema '[:=> [:cat :any] :boolean]} adt?
   "True if x is any ADT value (has :adt/type and :adt/variant keys)."
   [x]
   (and (map? x)
        (contains? x :adt/type)
        (contains? x :adt/variant)))
 
-(defn adt-valid?
+(defn ^{:malli/schema '[:=> [:cat :any] :boolean]} adt-valid?
   "True if x is a valid ADT value with a registered type and known variant."
   [x]
   (and (adt? x)
@@ -124,7 +126,7 @@
          (and (type-registered? type-kw)
               (contains? (type-variants type-kw) variant)))))
 
-(defn adt-data
+(defn ^{:malli/schema '[:=> [:cat :any] [:maybe :map]]} adt-data
   "Extract the data fields from an ADT value (everything except :adt/type and :adt/variant)."
   [x]
   (when (map? x)
@@ -134,7 +136,10 @@
 ;; Construction & Coercion
 ;; =============================================================================
 
-(defn make-variant
+(defn ^{:malli/schema '[:function
+                        [:=> [:cat :any :any] [:map [:adt/type :any] [:adt/variant :any]]]
+                        [:=> [:cat :any :any [:maybe :map]] [:map [:adt/type :any] [:adt/variant :any]]]]}
+  make-variant
   "Construct an ADT variant value. Low-level constructor — prefer the
    generated constructor from defadt for validation.
 
@@ -147,7 +152,8 @@
      (merge {:adt/type type-kw :adt/variant variant-kw} data)
      {:adt/type type-kw :adt/variant variant-kw})))
 
-(defn coerce-keyword
+(defn ^{:malli/schema '[:=> [:cat :any :any] [:maybe [:map [:adt/type :keyword] [:adt/variant :any]]]]}
+  coerce-keyword
   "Coerce a keyword to an ADT variant value (no data fields).
    Returns nil if the keyword is not a valid variant of the type.
 
@@ -162,14 +168,16 @@
 ;; Serialization (EDN round-trip)
 ;; =============================================================================
 
-(defn serialize
+(defn ^{:malli/schema '[:=> [:cat :any] [:maybe [:map [:adt/type :any] [:adt/variant :any]]]]}
+  serialize
   "Serialize an ADT value to a plain map (EDN-safe).
    This is effectively identity since ADT values ARE plain maps,
    but ensures the return is a plain hash-map (not a record or subtype)."
   [x]
   (when (adt? x) (into {} x)))
 
-(defn deserialize
+(defn ^{:malli/schema '[:=> [:cat :any] [:maybe [:map [:adt/type :any] [:adt/variant :any]]]]}
+  deserialize
   "Deserialize a plain map to a validated ADT value.
    Returns the map if valid, nil otherwise.
 
@@ -189,7 +197,7 @@
 ;; Schema Validation (opt-in, like spec instrumentation)
 ;; =============================================================================
 
-(defn validate
+(defn ^{:malli/schema '[:=> [:cat [:map [:variants [:set :keyword]]] :any] :map]} validate
   "Validate an ADT value against its type's schema.
    Returns the value if valid, throws ex-info if invalid.
    Use for boundary validation (API entry points, deserialization).

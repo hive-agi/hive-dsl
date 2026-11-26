@@ -44,7 +44,7 @@
 ;; tap — inspect without unwrapping
 ;; =============================================================================
 
-(defn tap
+(defn ^{:malli/schema '[:=> [:cat :any ifn?] :any]} tap
   "Call f on the Ok value for side effect; return the Result unchanged.
    Err results pass through without invoking f. f's return value is ignored."
   [result f]
@@ -56,7 +56,7 @@
 ;; recover — Err -> Result
 ;; =============================================================================
 
-(defn recover
+(defn ^{:malli/schema '[:=> [:cat :any ifn?] :any]} recover
   "If result is Err, call (f err-map) to produce a recovery Result.
    f's return MUST itself be a Result; if it isn't, it's wrapped in ok.
    Ok results pass through unchanged."
@@ -69,7 +69,12 @@
 ;; retry-on — retry a thunk on matching Err
 ;; =============================================================================
 
-(defn retry-on
+(defn ^{:malli/schema '[:=> [:cat ifn? [:map
+                                         [:max {:optional true} pos-int?]
+                                         [:pred {:optional true} ifn?]
+                                         [:backoff-ms {:optional true} ifn?]]]
+                        :any]}
+  retry-on
   "Call (thunk) — a 0-arg fn returning a Result. If the Result is Err and
    (pred err) is truthy, wait (backoff-ms attempt) and retry. Stops after
    `:max` total attempts, returning the last Result.
@@ -108,7 +113,9 @@
               :err/partials errs
               :err/oks (into [] (comp (filter r/ok?) (map :ok)) results)}))))
 
-(defn fan-in
+(defn ^{:malli/schema '[:=> [:cat [:sequential [:or [:map [:ok :any]] [:map [:error :any]]]]]
+                        [:or [:map [:ok [:vector :any]]] [:map [:error [:= :partial]]]]]}
+  fan-in
   "Combine a collection of Results into a single Result.
    All Ok -> Ok of a vector of unwrapped values, order preserved.
    Any Err -> Err with :err/first, :err/partials, :err/oks."
@@ -136,7 +143,9 @@
           [:exhausted old])
         (recur)))))
 
-(defn with-budget
+(defn ^{:malli/schema '[:=> [:cat :some [:int {:min 0}] ifn?]
+                        [:or [:map [:ok :any]] [:map [:error :any]]]]}
+  with-budget
   "Atomically deduct cost from budget-atom, then run (op) — a 0-arg thunk
    returning a Result. If remaining < cost, returns
    Err :budget-exhausted (op is NOT invoked and NO deduction occurs).
@@ -160,7 +169,9 @@
 ;; with-persona — bind persona, enrich Err on exit
 ;; =============================================================================
 
-(defn with-persona
+(defn ^{:malli/schema '[:=> [:cat [:maybe :map] ifn?]
+                        [:or [:map [:ok :any]] [:map [:error :any]]]]}
+  with-persona
   "Bind *persona* to the given persona map while running (op) — a 0-arg
    thunk returning a Result. If op returns Err, merge `:persona/id` (from
    persona) into the error map so downstream observers see attribution.
@@ -178,7 +189,8 @@
 ;; with-crdt — bind crdt ref (T2 stub; T7+ adds full semantics)
 ;; =============================================================================
 
-(defn with-crdt
+(defn ^{:malli/schema '[:=> [:cat :any ifn?] [:or [:map [:ok :any]] [:map [:error :any]]]]}
+  with-crdt
   "Bind *crdt* to the given CRDT ref while running (op) — a 0-arg thunk
    returning a Result. T2 stub: simply threads the binding through.
    T7 will add merge hooks + reconciliation callbacks."

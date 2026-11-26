@@ -5,29 +5,32 @@
    err results: {:error category ...extra-data}"
   #?(:cljs (:require-macros [hive-dsl.result])))
 
-(defn ok
+(defn ^{:malli/schema '[:=> [:cat :any] [:map [:ok :any]]]} ok
   "Wrap a value in a success Result."
   [value]
   {:ok value})
 
-(defn err
+(defn ^{:malli/schema '[:function
+                        [:=> [:cat :keyword] [:map [:error :keyword]]]
+                        [:=> [:cat :keyword [:maybe :map]] [:map [:error :any]]]]}
+  err
   "Create an error Result with category keyword and optional data map."
   ([category]
    {:error category})
   ([category data]
    (merge {:error category} data)))
 
-(defn ok?
+(defn ^{:malli/schema '[:=> [:cat :any] :boolean]} ok?
   "True if result is a success."
   [r]
   (and (map? r) (contains? r :ok)))
 
-(defn err?
+(defn ^{:malli/schema '[:=> [:cat :any] :boolean]} err?
   "True if result is an error."
   [r]
   (and (map? r) (contains? r :error)))
 
-(defn bind
+(defn ^{:malli/schema '[:=> [:cat :any ifn?] :any]} bind
   "Monadic bind. If result is ok, applies f to the unwrapped value.
    If result is err, short-circuits and returns the error unchanged.
    f must return a Result."
@@ -36,7 +39,7 @@
     (f (:ok result))
     result))
 
-(defn map-ok
+(defn ^{:malli/schema '[:=> [:cat :any ifn?] :any]} map-ok
   "Functor map over ok values. Applies f to the unwrapped value and
    re-wraps in ok. Errors pass through unchanged.
    Unlike bind, f returns a plain value (not a Result)."
@@ -45,7 +48,7 @@
     (ok (f (:ok result)))
     result))
 
-(defn map-err
+(defn ^{:malli/schema '[:=> [:cat :any ifn?] :any]} map-err
   "Map over error values. Applies f to the error map (without :error key)
    and merges result back. Ok values pass through unchanged.
    f receives the full error result map."
@@ -106,7 +109,8 @@
                      :type     ~type-expr
                      :value    ~r})))))))
 
-(defn ensure-result
+(defn ^{:malli/schema '[:=> [:cat :any] [:or [:map [:ok :any]] [:map [:error :any]]]]}
+  ensure-result
   "If x is already a Result (ok or err), return as-is. Otherwise wrap in ok.
    Used by ok-> and ok->> for smart-wrapping step results."
   [x]
@@ -325,7 +329,7 @@
                                          :form    ~(str (first body))}})
                 ~fb))))))
 
-(defn on-error
+(defn ^{:malli/schema '[:=> [:cat ifn? :any] :any]} on-error
   "Middleware: inspect rescue result, call handler-fn if error metadata present.
    Composes with rescue — rescue captures, on-error reacts.
 
@@ -339,7 +343,7 @@
     (handler-fn err))
   result)
 
-(defn with-error-handler
+(defn ^{:malli/schema '[:=> [:cat ifn? ifn?] ifn?]} with-error-handler
   "HOF middleware: wrap a rescue-fn with an error callback.
    Creates a composed fn that calls handler-fn on rescue failures.
 
@@ -352,7 +356,8 @@
     (let [result (apply rescue-wrapped-fn args)]
       (on-error handler-fn result))))
 
-(defn rescue-fn
+(defn ^{:malli/schema '[:function [:=> [:cat ifn?] ifn?] [:=> [:cat ifn? :any] ifn?]]}
+  rescue-fn
   "Wrap f: on throwable return fallback (default nil). For keep/map pipelines.
    Eliminates (keep (fn [x] (try (f x) (catch Exception _ nil))) coll).
 
@@ -364,7 +369,8 @@
      (try (apply f args)
           (catch #?(:clj Throwable :cljs :default :cljr Exception :lpy python/Exception :default :default) _ fallback)))))
 
-(defn guard-fn
+(defn ^{:malli/schema '[:function [:=> [:cat :some ifn?] ifn?] [:=> [:cat :some ifn? :any] ifn?]]}
+  guard-fn
   "Like rescue-fn but catches a specific class. For selective pipelines.
 
    (keep (guard-fn Exception #(parse %)) items)
@@ -397,7 +403,7 @@
 ;; via `requiring-resolve` so hive-dsl itself does not hard-depend on
 ;; c.t.l. If the logger is absent, logging is a silent no-op.
 
-(defn resolve-warn-fn
+(defn ^{:malli/schema '[:=> [:cat] [:maybe ifn?]]} resolve-warn-fn
   "Best-effort lookup of clojure.tools.logging/warn. Returns fn or nil.
    Public because rescue-log/rescue-interrupt macros expand to call sites
    that resolve this var in the caller's namespace. Returns nil on any host

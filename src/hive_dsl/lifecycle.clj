@@ -34,7 +34,7 @@
 ;; Lifecycle State Helpers
 ;; =============================================================================
 
-(defn lifecycle-state
+(defn ^{:malli/schema '[:=> [:cat :any] :any]} lifecycle-state
   "Return the current lifecycle state of a resource.
    Convention: state is stored in an atom at key :state.
    Returns :stopped, :started, or :error."
@@ -44,12 +44,12 @@
       @s
       s)))
 
-(defn started?
+(defn ^{:malli/schema '[:=> [:cat :any] :boolean]} started?
   "True if resource is in :started state."
   [resource]
   (= :started (lifecycle-state resource)))
 
-(defn stopped?
+(defn ^{:malli/schema '[:=> [:cat :any] :boolean]} stopped?
   "True if resource is in :stopped state."
   [resource]
   (= :stopped (lifecycle-state resource)))
@@ -93,13 +93,13 @@
 ;; with-lifecycle-scope — Multi-resource LIFO cleanup
 ;; =============================================================================
 
-(defn new-lifecycle-scope
+(defn ^{:malli/schema '[:=> [:cat] :some]} new-lifecycle-scope
   "Create a new lifecycle scope. Returns an atom holding a stack of
    started Lifecycle resources."
   []
   (atom []))
 
-(defn scope-start!
+(defn ^{:malli/schema '[:=> [:cat :some :some] :some]} scope-start!
   "Start a Lifecycle resource within a scope.
    Calls start! on the resource, pushes the started resource onto the
    scope stack, and returns the started resource.
@@ -111,7 +111,8 @@
     (swap! scope conj started)
     started))
 
-(defn scope-stop!
+(defn ^{:malli/schema '[:=> [:cat :some] [:vector [:map [:resource :any] [:error [:maybe :string]]]]]}
+  scope-stop!
   "Stop all resources in a scope in LIFO order.
    Errors during stop are collected but do not halt the sweep.
    Returns vector of any stop errors (empty on success)."
@@ -225,7 +226,8 @@
                           (long period-ms)
                           TimeUnit/MILLISECONDS)))
 
-(defn ->managed-executor
+(defn ^{:malli/schema '[:=> [:cat pos-int?] [:map [:pool-size pos-int?] [:state :some] [:executor :some]]]}
+  ->managed-executor
   "Create an unstarted ManagedExecutor wrapping a ScheduledThreadPoolExecutor.
    Call start! to create the thread pool."
   [pool-size]
@@ -280,7 +282,8 @@
                       {:state @state})))
     (async/<!! @channel)))
 
-(defn ->managed-channel
+(defn ^{:malli/schema '[:=> [:cat pos-int?] [:map [:buf-size pos-int?] [:state :some] [:channel :some]]]}
+  ->managed-channel
   "Create an unstarted ManagedChannel wrapping a core.async buffered channel.
    Call start! to create the channel."
   [buf-size]

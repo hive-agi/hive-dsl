@@ -39,20 +39,20 @@
 
 (defonce ^:private sweepable-registry (atom {}))
 
-(defn register-sweepable!
+(defn ^{:malli/schema '[:=> [:cat [:map [:atom :some]] :any] :nil]} register-sweepable!
   "Register a bounded atom in the global sweep registry.
    name-kw is a keyword identifier for diagnostics."
   [batom name-kw]
   (swap! sweepable-registry assoc name-kw batom)
   nil)
 
-(defn unregister-sweepable!
+(defn ^{:malli/schema '[:=> [:cat :any] :nil]} unregister-sweepable!
   "Remove a bounded atom from the sweep registry."
   [name-kw]
   (swap! sweepable-registry dissoc name-kw)
   nil)
 
-(defn registered-sweepables
+(defn ^{:malli/schema '[:=> [:cat] [:map-of :any [:map [:atom :some]]]]} registered-sweepables
   "Return the map of all registered sweepable bounded atoms."
   []
   @sweepable-registry)
@@ -199,7 +199,17 @@
 ;; Bounded Atom constructor
 ;; =============================================================================
 
-(defn bounded-atom
+(defn ^{:malli/schema '[:=> [:cat [:map
+                                   [:max-entries pos-int?]
+                                   [:ttl-ms {:optional true} [:maybe pos-int?]]
+                                   [:eviction-policy {:optional true} [:enum :lru :fifo :ttl]]
+                                   [:on-evict {:optional true} [:maybe ifn?]]
+                                   [:on-sweep {:optional true} [:maybe ifn?]]
+                                   [:name {:optional true} :any]]]
+                        [:map [:atom :some] [:name :any]
+                         [:opts [:map [:max-entries pos-int?] [:ttl-ms [:maybe pos-int?]]
+                                 [:eviction-policy [:enum :lru :fifo :ttl]]]]]]}
+  bounded-atom
   "Create a bounded atom — a map-valued atom with size and TTL limits.
 
    Options:
@@ -236,7 +246,7 @@
 ;; Core operations
 ;; =============================================================================
 
-(defn bget
+(defn ^{:malli/schema '[:=> [:cat [:map [:atom :some] [:opts :map]] :any] :any]} bget
   "Get entry data by key. Touches the entry (updates :last-accessed).
    Returns the data value or nil if not found / expired."
   [batom k]
@@ -249,7 +259,10 @@
         (do (swap! atom update k touch-entry)
             (:data entry))))))
 
-(defn bput!
+(defn ^{:malli/schema '[:=> [:cat [:map [:atom :some] [:opts :map]] :any :any]
+                        [:map [:result :map] [:evicted-count nat-int?]
+                         [:eviction-reason [:maybe [:enum :ttl :capacity :ttl+capacity]]]]]}
+  bput!
   "Put a single entry. Enforces capacity, evicting per policy when full.
    Returns {:result new-val :evicted-count N :eviction-reason reason}.
    Fires :on-evict callback if evictions occurred."
@@ -268,7 +281,10 @@
     (fire-on-evict! batom (:evicted-count res) (:eviction-reason res) (count new-state))
     (assoc res :result new-state)))
 
-(defn bounded-swap!
+(defn ^{:malli/schema '[:=> [:cat [:map [:atom :some] [:opts :map]] ifn? [:* :any]]
+                        [:map [:result :map] [:evicted-count nat-int?]
+                         [:eviction-reason [:maybe [:enum :ttl :capacity :ttl+capacity]]]]]}
+  bounded-swap!
   "Like swap! but enforces max-entries, evicting per policy when full.
    f receives the current entry-map and must return a new entry-map.
    Raw entries are maps of key -> {:data X :created-at T :last-accessed T}.
@@ -289,7 +305,10 @@
     (fire-on-evict! batom (:evicted-count res) (:eviction-reason res) (count new-state))
     (assoc res :result new-state)))
 
-(defn bounded-reset!
+(defn ^{:malli/schema '[:=> [:cat [:map [:atom :some] [:opts :map]] :map]
+                        [:map [:result :map] [:evicted-count nat-int?]
+                         [:eviction-reason [:maybe [:enum :ttl :capacity :ttl+capacity]]]]]}
+  bounded-reset!
   "Bulk replacement with size check. new-map must be a map of
    key -> {:data X :created-at T :last-accessed T}.
    Entries exceeding max-entries are evicted per policy.
@@ -305,17 +324,17 @@
      :evicted-count evicted
      :eviction-reason reason}))
 
-(defn bcount
+(defn ^{:malli/schema '[:=> [:cat [:map [:atom :some]]] nat-int?]} bcount
   "Return the number of entries in the bounded atom."
   [batom]
   (count @(:atom batom)))
 
-(defn bkeys
+(defn ^{:malli/schema '[:=> [:cat [:map [:atom :some]]] [:maybe [:sequential :any]]]} bkeys
   "Return the keys of the bounded atom."
   [batom]
   (keys @(:atom batom)))
 
-(defn bclear!
+(defn ^{:malli/schema '[:=> [:cat [:map [:atom :some]]] :nil]} bclear!
   "Clear all entries from the bounded atom."
   [batom]
   (reset! (:atom batom) {})
@@ -325,7 +344,10 @@
 ;; Sweep — bulk TTL eviction across all registered atoms
 ;; =============================================================================
 
-(defn sweep!
+(defn ^{:malli/schema '[:=> [:cat [:map [:atom :some] [:opts :map]] :any]
+                        [:map [:name :any] [:evicted-count int?] [:remaining nat-int?]
+                         [:duration-ms number?]]]}
+  sweep!
   "Evict expired entries from a single bounded atom.
    Returns {:name name-kw :evicted-count N :remaining N :duration-ms N}.
    Fires :on-sweep callback if configured."
@@ -351,7 +373,9 @@
           (try (on-sweep result) (catch Exception _ nil)))
         result))))
 
-(defn sweep-all!
+(defn ^{:malli/schema '[:=> [:cat] [:vector [:map [:name :any] [:evicted-count int?]
+                                         [:remaining nat-int?] [:duration-ms number?]]]]}
+  sweep-all!
   "Iterate all registered bounded atoms, evict expired entries.
    Returns vector of per-atom stats."
   []
@@ -366,7 +390,9 @@
 
 (defonce ^:private *sweep-scheduler (atom nil))
 
-(defn sweep-scheduler-status
+(defn ^{:malli/schema '[:=> [:cat] [:map [:running? :boolean] [:interval-ms [:maybe int?]]
+                                [:last-sweep-at :any] [:sweep-count nat-int?]]]}
+  sweep-scheduler-status
   "Return {:running? bool :interval-ms N :last-sweep-at inst :sweep-count N}"
   []
   (if-let [state @*sweep-scheduler]
@@ -379,7 +405,7 @@
      :last-sweep-at nil
      :sweep-count   0}))
 
-(defn stop-sweep-scheduler!
+(defn ^{:malli/schema '[:=> [:cat] :nil]} stop-sweep-scheduler!
   "Stop periodic sweep. Idempotent."
   []
   (when-let [state @*sweep-scheduler]
@@ -389,7 +415,12 @@
     (reset! *sweep-scheduler nil))
   nil)
 
-(defn start-sweep-scheduler!
+(defn ^{:malli/schema '[:function
+                        [:=> [:cat] ifn?]
+                        [:=> [:cat [:map [:interval-ms {:optional true} pos-int?]
+                                    [:on-sweep-complete {:optional true} [:maybe ifn?]]]]
+                         ifn?]]}
+  start-sweep-scheduler!
   "Start periodic sweep of all registered bounded atoms.
    Returns a stop function. Idempotent — second call is no-op.
 

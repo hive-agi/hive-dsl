@@ -31,7 +31,8 @@
    Derived by inverting hive-dsl.adt/pred-table, the ONE source."
   (into {} (map (fn [[sym f]] [f sym])) adt/pred-table))
 
-(defn variant->map-schema
+(defn ^{:malli/schema '[:=> [:cat :keyword :keyword [:maybe [:map-of :keyword :any]]] [:vector :any]]}
+  variant->map-schema
   "A malli :map schema for one variant: the :adt/type and :adt/variant tag keys
    pinned to their values, plus each declared field required and typed. Known
    core predicates are upgraded to their symbolic malli schemas (generator-
@@ -43,7 +44,7 @@
         (map (fn [[field pred]] [field (get pred->schema pred [:fn pred])]))
         field->pred))
 
-(defn adt->malli
+(defn ^{:malli/schema '[:=> [:cat [:map [:variants [:set :keyword]]]] [:vector :any]]} adt->malli
   "ONE malli :multi schema (dispatch :adt/variant) for the whole ADT `type-meta`
    ({:type :variants :schemas}). Enum variants (no schema) validate the tag keys
    only; data variants add their field->pred map as [:fn ...] entries. This is the
@@ -55,7 +56,7 @@
                [variant (variant->map-schema type variant (get schemas variant {}))]))
         variants))
 
-(defn validate-malli
+(defn ^{:malli/schema '[:=> [:cat [:map [:variants [:set :keyword]]] :any] :map]} validate-malli
   "Validate an ADT value `x` against its `type-meta`'s derived malli schema.
    Returns x when valid; throws ex-info {:error :schema/invalid ...} otherwise.
    When malli is absent, falls back to hive-dsl.adt/validate (the hand-rolled

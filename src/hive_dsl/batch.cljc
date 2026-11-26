@@ -16,7 +16,8 @@
 ;; Batch primitives
 ;; =============================================================================
 
-(defn tx-batch
+(defn ^{:malli/schema '[:=> [:cat :any ifn?] [:map [:conn :any] [:tx-data :some] [:flush-fn ifn?]]]}
+  tx-batch
   "Create a new transaction batch tied to a connection.
 
    Returns a batch map:
@@ -31,7 +32,7 @@
    :tx-data (atom [])
    :flush-fn flush-fn})
 
-(defn normalize-tx-datum
+(defn ^{:malli/schema '[:=> [:cat :any] [:vector :any]]} normalize-tx-datum
   "Normalize tx-datum into flat vector of individual datoms.
    Maps -> [map], [:db/add ...] -> [[:db/add ...]], colls -> (vec coll).
    Pure function — no side effects."
@@ -42,7 +43,7 @@
     (sequential? tx-datum)                               (vec tx-datum)
     :else                                                [tx-datum]))
 
-(defn batch-add!
+(defn ^{:malli/schema '[:=> [:cat [:map [:tx-data :some]] :any] [:map [:tx-data :some]]]} batch-add!
   "Add transaction data to a batch. Accepts a single tx-datum (map or vector)
    or a collection of tx-data.
 
@@ -54,7 +55,9 @@
   (swap! (:tx-data batch) into (normalize-tx-datum tx-datum))
   batch)
 
-(defn batch-flush!
+(defn ^{:malli/schema '[:=> [:cat [:map [:tx-data :some] [:flush-fn ifn?]]]
+                        [:or [:map [:ok :any]] [:map [:error :keyword]]]]}
+  batch-flush!
   "Flush accumulated tx-data as a single transaction.
 
    Returns:
@@ -74,7 +77,7 @@
                                       :class (str (class t))
                                       :tx-count (count data)}))))))
 
-(defn batch-count
+(defn ^{:malli/schema '[:=> [:cat [:map [:tx-data :some]]] nat-int?]} batch-count
   "Return the number of accumulated tx-data items in the batch."
   [batch]
   (count @(:tx-data batch)))
@@ -106,7 +109,7 @@
 ;; Transparent batch scope (dynamic-var-based)
 ;; =============================================================================
 
-(defn transparent-batch-scope
+(defn ^{:malli/schema '[:=> [:cat :some ifn?] ifn?]} transparent-batch-scope
   "Create a reusable transparent-batch scope function bound to a dynamic var.
 
    Arguments:

@@ -7,7 +7,8 @@
 ;; Set of all registered error category keywords. Thread-safe via atom.
 (defonce registry (atom #{}))
 
-(defn register!
+(defn ^{:malli/schema '[:=> [:cat [:or [:set :keyword] [:sequential :keyword]]] [:set :any]]}
+  register!
   "Register a set of error category keywords.
    Idempotent — safe to call multiple times with overlapping sets.
 
@@ -15,12 +16,12 @@
   [categories]
   (swap! registry into categories))
 
-(defn known-error?
+(defn ^{:malli/schema '[:=> [:cat :any] :boolean]} known-error?
   "True if category is a registered error keyword."
   [category]
   (contains? @registry category))
 
-(defn registered-categories
+(defn ^{:malli/schema '[:=> [:cat] [:set :any]]} registered-categories
   "Return the current set of all registered error categories."
   []
   @registry)

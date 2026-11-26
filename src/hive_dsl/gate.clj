@@ -55,7 +55,13 @@
 ;; Constructor
 ;; =============================================================================
 
-(defn gate
+(defn ^{:malli/schema '[:=> [:cat [:map [:permits {:optional true} pos-int?]
+                                   [:timeout-ms {:optional true} nat-int?]
+                                   [:name {:optional true} :string]
+                                   [:fair? {:optional true} :boolean]]]
+                        [:map [:name :string] [:permits pos-int?] [:timeout-ms nat-int?]
+                         [:semaphore :some] [:state :some]]]}
+  gate
   "Create a concurrency gate.
 
    Options:
@@ -76,7 +82,9 @@
 ;; Core Execution
 ;; =============================================================================
 
-(defn gate-run
+(defn ^{:malli/schema '[:=> [:cat [:map [:semaphore :some]] ifn?]
+                        [:or [:map [:ok :any]] [:map [:error :keyword]]]]}
+  gate-run
   "Execute f under the gate's permit. Returns Result.
 
    On success: (ok <return-value>)
@@ -102,7 +110,7 @@
               :available  (.availablePermits sem)
               :hint       "Too many concurrent operations or downstream is locked"}))))
 
-(defn gate-run!
+(defn ^{:malli/schema '[:=> [:cat [:map [:semaphore :some]] ifn?] :any]} gate-run!
   "Execute f under the gate's permit. Throws on timeout.
    For call sites that prefer exceptions over Result."
   [^Gate g f]
@@ -143,7 +151,10 @@
 ;; Gated Deref — replaces bare @ on promises/futures
 ;; =============================================================================
 
-(defn deref-gate
+(defn ^{:malli/schema '[:function
+                        [:=> [:cat [:map [:semaphore :some]] :some] :any]
+                        [:=> [:cat [:map [:semaphore :some]] :some nat-int?] :any]]}
+  deref-gate
   "Deref a promise/future under the gate's permit with timeout.
    Replaces bare `@(chroma/query ...)` with bounded concurrency + timeout.
 
@@ -177,7 +188,10 @@
 ;; Diagnostics
 ;; =============================================================================
 
-(defn gate-stats
+(defn ^{:malli/schema '[:=> [:cat [:map [:semaphore :some]]]
+                        [:map [:name :any] [:permits pos-int?] [:available int?]
+                         [:queue-length nat-int?] [:state :keyword]]]}
+  gate-stats
   "Current gate state for diagnostics.
 
    Returns:

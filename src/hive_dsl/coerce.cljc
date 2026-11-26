@@ -20,7 +20,8 @@
 ;; Scalar Coercions
 ;; =============================================================================
 
-(defn ->int
+(defn ^{:malli/schema '[:=> [:cat :any] [:or [:map [:ok [:maybe int?]]] [:map [:error :keyword]]]]}
+  ->int
   "Coerce value to integer.
 
    \"3\"  → {:ok 3}
@@ -41,7 +42,8 @@
                         {:message (str "Expected integer, got " (type v) ": " (pr-str v))
                          :value v})))
 
-(defn ->double
+(defn ^{:malli/schema '[:=> [:cat :any] [:or [:map [:ok [:maybe double?]]] [:map [:error :keyword]]]]}
+  ->double
   "Coerce value to double.
 
    \"0.9\" → {:ok 0.9}
@@ -63,7 +65,8 @@
                         {:message (str "Expected number, got " (type v) ": " (pr-str v))
                          :value v})))
 
-(defn ->keyword
+(defn ^{:malli/schema '[:=> [:cat :any] [:or [:map [:ok [:maybe :keyword]]] [:map [:error :keyword]]]]}
+  ->keyword
   "Coerce value to keyword.
 
    \"both\"  → {:ok :both}
@@ -80,7 +83,8 @@
                         {:message (str "Expected string or keyword, got " (type v))
                          :value v})))
 
-(defn ->boolean
+(defn ^{:malli/schema '[:=> [:cat :any] [:or [:map [:ok [:maybe :boolean]]] [:map [:error :keyword]]]]}
+  ->boolean
   "Coerce value to boolean.
 
    \"true\"  → {:ok true}
@@ -101,7 +105,8 @@
                          {:message (str "Expected boolean, got " (type v))
                           :value v})))
 
-(defn ->vec
+(defn ^{:malli/schema '[:=> [:cat :any] [:or [:map [:ok [:maybe vector?]]] [:map [:error :keyword]]]]}
+  ->vec
   "Coerce value to vector.
 
    [\"a\"]       → {:ok [\"a\"]}
@@ -142,7 +147,9 @@
                            {:message (str "Expected array, got " (type v))
                             :value v})))
 
-(defn ->enum
+(defn ^{:malli/schema '[:=> [:cat :any [:set :keyword]]
+                        [:or [:map [:ok [:maybe :keyword]]] [:map [:error :keyword]]]]}
+  ->enum
   "Coerce value to keyword and validate against allowed set.
 
    (->enum \"both\" #{:outgoing :incoming :both}) → {:ok :both}
@@ -183,7 +190,9 @@
     :enum    (->enum v (first args))
     (r/err :coerce/unknown-type {:message (str "Unknown coerce type: " type-kw)})))
 
-(defn coerce-map
+(defn ^{:malli/schema '[:=> [:cat [:map-of :any [:vector {:min 1} :any]] :map]
+                        [:or [:map [:ok :map]] [:map [:error :keyword]]]]}
+  coerce-map
   "Declarative map coercion — coerce param map fields per schema.
 
    schema: {field-key [type-spec ...]}
