@@ -167,6 +167,27 @@
                :fallback any?
                :body (s/+ any?)))
 
+;; try-ordered: Java-style ordered per-class catch returning a plain value.
+;; (try-ordered ctx [[Class handler] ... [:else handler]] body...)
+;; `ctx` is any expression; the clause vector is a non-empty vector of
+;; [Class-or-:else handler] pairs. A macro, so the fdef documents the shape
+;; (and feeds kondo / spec tooling) rather than being instrumentable.
+(s/def ::try-ordered-clause
+  (s/and vector?
+         #(= 2 (count %))
+         #(or (symbol? (first %)) (= :else (first %)))
+         #(some? (second %))))
+
+(s/def ::try-ordered-clauses
+  (s/and vector?
+         #(seq %)
+         #(every? (fn [c] (s/valid? ::try-ordered-clause c)) %)))
+
+(s/fdef r/try-ordered
+  :args (s/cat :ctx any?
+               :clauses ::try-ordered-clauses
+               :body (s/* any?)))
+
 ;; =============================================================================
 ;; Taxonomy Contracts
 ;; =============================================================================
