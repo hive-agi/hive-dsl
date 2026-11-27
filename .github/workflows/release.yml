@@ -90,17 +90,31 @@ jobs:
 
       # The release number comes from the tags, not from a commit back to main.
       # VERSION in the tree is a FLOOR (raise it in a staging PR to open a new
-      # minor line); this run releases patch+1 of max(VERSION, newest v* tag).
+      # minor line). When VERSION is STRICTLY above the newest v* tag, or there
+      # is no tag at all, it IS the release: x.y.0 can only ever ship by raising
+      # the floor, since a bump always increments the patch. Otherwise this run
+      # releases patch+1 of the newest tag, as before. A floor EQUAL to the tag
+      # is not above it, so it still bumps.
       - name: Resolve release base from tags
         run: |
           set -euo pipefail
           FLOOR=$(tr -d '[:space:]' < VERSION)
           LAST=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -n1 | sed 's/^v//')
-          BASE=$(printf '%s\n%s\n' "$FLOOR" "${LAST:-$FLOOR}" | sort -V | tail -n1)
-          echo "VERSION floor $FLOOR, newest tag ${LAST:-none}: base $BASE"
+          NEWER=$(printf '%s\n%s\n' "$FLOOR" "${LAST:-$FLOOR}" | sort -V | tail -n1)
+          if [ -z "$LAST" ] || { [ "$NEWER" = "$FLOOR" ] && [ "$FLOOR" != "$LAST" ]; }; then
+            BUMP=false
+            BASE=$FLOOR
+            echo "VERSION floor $FLOOR, newest tag ${LAST:-none}: releasing $BASE exactly (no bump)"
+          else
+            BUMP=true
+            BASE=$LAST
+            echo "VERSION floor $FLOOR, newest tag ${LAST:-none}: bumping patch on $BASE"
+          fi
           printf '%s\n' "$BASE" > VERSION
+          echo "BUMP=$BUMP" >> "$GITHUB_ENV"
 
       - name: Bump patch version
+        if: env.BUMP == 'true'
         run: clojure -T:build bump :level :patch
 
       - name: Deploy
