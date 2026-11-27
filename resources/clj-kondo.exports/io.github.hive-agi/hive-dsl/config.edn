@@ -22,6 +22,7 @@
    hive-dsl.result/try-effect             hive-dsl.hooks.result/try-effect
    hive-dsl.result/try-effect*            hive-dsl.hooks.result/try-effect*
    hive-dsl.result/try-effect-throwable*  hive-dsl.hooks.result/try-effect*
+   hive-dsl.result/try-ordered            hive-dsl.hooks.result/try-ordered
    hive-dsl.resource/with-scope           hive-dsl.hooks.macros/with-scope
    hive-dsl.lifecycle/with-lifecycle-scope hive-dsl.hooks.macros/with-scope
    hive-dsl.managed-channel/with-go-loop  hive-dsl.hooks.macros/with-go-loop

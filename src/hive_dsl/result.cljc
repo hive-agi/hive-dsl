@@ -329,6 +329,144 @@
                                          :form    ~(str (first body))}})
                 ~fb))))))
 
+;; --- try-ordered: ordered per-class catch, one handler per class -------------
+;;
+;; The one thing the rescue family cannot say: a REAL Java try with several
+;; `catch` clauses, each dispatching on a class, in the order written. `guard`
+;; catches ONE class; `rescue`/`rescue-ex` catch everything once. An
+;; interceptor that must answer 413 for FileUploadException, IOException and
+;; ExceptionInfo, and 400 for anything else, needs four ordered clauses, each
+;; seeing the exception AND the original context, returning a PLAIN updated
+;; context -- not a Result.
+;;
+;; Semantics, all of them Java's:
+;;   - the first matching class wins;
+;;   - a subclass listed after its superclass is UNREACHABLE, so the macro
+;;     REFUSES that ordering at expansion (isAssignableFrom on the resolved
+;;     classes): the shadowing rule turned into a compile error;
+;;   - a throw inside a handler propagates, as it would in Java;
+;;   - the value is the body's on success, a handler's on catch: PLAIN, never
+;;     wrapped (the interceptor edge wants a context, not a railway).
+
+(defn- resolve-catch-class
+  "Resolve `sym` to a Class at macroexpansion time, or nil where this host has
+   no class to resolve (ClojureScript, the class-free native runtimes) or the
+   symbol names no class. nil disables the ordering refusal for that clause;
+   the emitted `catch` then fails the host's own compiler, which is the right
+   place for that error."
+  [sym]
+  #?(:clj
+     (when (symbol? sym)
+       (let [v (try (ns-resolve *ns* sym) (catch Throwable _ nil))]
+         (cond
+           (class? v)                        v
+           (and (var? v) (class? (deref v))) (deref v)
+           :else (try (Class/forName (str sym)) (catch Throwable _ nil)))))
+     :default nil))
+
+(defn- try-ordered-clause-class
+  "The Class a clause dispatches on: the resolved class for a class clause, or
+   the host's Exception for `:else` (the catch-all). nil where no class can be
+   resolved."
+  [c]
+  (if (= :else c)
+    #?(:clj Exception :default nil)
+    (resolve-catch-class c)))
+
+(defn- check-try-ordered-clauses!
+  "Refuse, at macroexpansion, a clause the JVM would never reach: a subclass
+   listed after its superclass (the earlier catch already claims every
+   instance), or any clause after `:else`. The test is `isAssignableFrom` on
+   the RESOLVED classes -- Java's own shadowing rule. Clauses whose class
+   cannot be resolved are skipped (the host's compiler surfaces those)."
+  [clauses]
+  #?(:clj
+     (let [n (count clauses)]
+       (dotimes [i n]
+         (let [c (first (nth clauses i))]
+           (when (and (= :else c) (< (inc i) n))
+             (throw (ex-info (str "try-ordered: clause " (inc i)
+                                  " follows :else and can never be reached")
+                             {:category :result/try-ordered-unreachable-clause
+                              :clause   c :index i})))))
+       (doseq [i (range n)
+               j (range (inc i) n)]
+         (let [ci (first (nth clauses i))
+               cj (first (nth clauses j))
+               ki (try-ordered-clause-class ci)
+               kj (try-ordered-clause-class cj)]
+           (when (and ki kj (not= :else ci)
+                      (.isAssignableFrom ^Class ki ^Class kj))
+             (throw (ex-info
+                     (str "try-ordered: clause " (inc j) " (" cj ") is unreachable -- "
+                          "clause " (inc i) " (" ci ") is its superclass and matches "
+                          "every instance first")
+                     {:category      :result/try-ordered-unreachable-clause
+                      :earlier       ci :later cj
+                      :earlier-index i  :later-index j}))))))
+     :default nil))
+
+(defmacro try-ordered
+  "Java's ordered per-class `catch`, as one form, returning a PLAIN value.
+
+   `ctx`     -- the context expression, evaluated once and handed to whichever
+                handler fires, so a handler sees the exception and the
+                ORIGINAL context.
+   `clauses` -- an ordered vector of `[Class handler]`, plus at most one
+                `[:else handler]` as the LAST clause (the catch-all).
+                `handler` is an expression called as `(handler exception ctx)`;
+                its value is the macro's value.
+   `body`    -- the protected expressions; their value is the macro's value
+                when nothing throws.
+
+   The first matching class wins. A subclass listed after its superclass is
+   unreachable and the macro REFUSES that ordering at expansion. `:else`
+   catches Exception (not Error) on the JVM, and `:default` on ClojureScript,
+   where the ordering refusal is skipped too (there are no classes to reason
+   about). A throw inside a handler propagates unchanged.
+
+   (r/try-ordered ctx
+     [[java.io.FileNotFoundException (fn [e ctx] (log/warn (ex-message e))
+                                       (assoc ctx :status 413))]
+      [java.io.IOException            (fn [e ctx] (log/warn (ex-message e))
+                                       (assoc ctx :status 413))]
+      [clojure.lang.ExceptionInfo     (fn [e ctx] (log/warn (ex-message e))
+                                       (assoc ctx :status 413))]
+      [:else                          (fn [e ctx] (log/error e)
+                                       (assoc ctx :status 400
+                                                  :body {:error (ex-message e)}))]]
+     (parse-multipart req))"
+  [ctx clauses & body]
+  (when-not (vector? clauses)
+    (throw (ex-info "try-ordered: clauses must be a vector of [Class handler] or [:else handler]"
+                    {:category :result/try-ordered-malformed-clauses :got clauses})))
+  (doseq [clause clauses]
+    (when-not (and (vector? clause) (= 2 (count clause))
+                   (let [c (first clause)] (or (symbol? c) (= :else c)))
+                   (some? (second clause)))
+      (throw (ex-info "try-ordered: each clause must be [Class handler] or [:else handler]"
+                      {:category :result/try-ordered-malformed-clauses
+                       :clause   clause}))))
+  (let [cljs? (boolean (:ns &env))]
+    (when-not cljs?
+      (check-try-ordered-clauses! clauses))
+    (let [ctx# (gensym "ctx")
+          e#   (gensym "e")
+          catches
+          (for [[c h] clauses]
+            (let [catch-sym
+                  (if (= :else c)
+                    (host-exception cljs?)
+                    (if cljs?
+                      c
+                      (let [rc (resolve-catch-class c)]
+                        (if (class? rc) (symbol (.getName ^Class rc)) c))))]
+              `(catch ~catch-sym ~e# (~h ~e# ~ctx#))))]
+      `(let [~ctx# ~ctx]
+         (try
+           (do ~@body)
+           ~@catches)))))
+
 (defn ^{:malli/schema '[:=> [:cat ifn? :any] :any]} on-error
   "Middleware: inspect rescue result, call handler-fn if error metadata present.
    Composes with rescue — rescue captures, on-error reacts.

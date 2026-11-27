@@ -1,0 +1,24 @@
+{:assertion {:escaped "class java.lang.AssertionError"},
+ :ex-info
+ {:status 413,
+  :kind :ex-info,
+  :branch :ex-info,
+  :msg "multipart rejected"},
+ :file-upload
+ {:status 413,
+  :kind :file-upload,
+  :branch :file-upload,
+  :msg "multipart too large"},
+ :io
+ {:status 413, :kind :io, :branch :io, :msg "multipart read failed"},
+ :npe
+ {:status 400,
+  :kind :npe,
+  :branch :catch-all,
+  :body {:error "nil part"}},
+ :ok {:status 0, :kind :ok, :branch :none},
+ :runtime
+ {:status 400,
+  :kind :runtime,
+  :branch :catch-all,
+  :body {:error "unexpected failure"}}}
