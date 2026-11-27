@@ -58,6 +58,20 @@
   (let [[label fallback & body] (rest (:children node))]
     {:node (leading-then-body [label fallback] body)}))
 
+(defn try-ordered
+  "Hook for (try-ordered ctx clauses & body). `clauses` is an ordered vector of
+   `[Class handler]` pairs plus a final `[:else handler]`. The class symbols are
+   inert data: the ctx expression and each clause's handler are analyzed as
+   expressions (bound to `_` so a handler literal is not an unused value), and
+   every body expression is analyzed in tail position."
+  [{:keys [node]}]
+  (let [[_ ctx clauses & body] (:children node)
+        handlers (map (fn [clause]
+                        (let [[_cls handler] (:children clause)]
+                          handler))
+                      (:children clauses))]
+    {:node (leading-then-body (cons ctx handlers) body)}))
+
 (defn let-ok
   "Hook for (let-ok [sym expr ... :let [normal-bindings] ...] & body).
    Railway-oriented let: each `sym expr` pair binds the unwrapped ok value,

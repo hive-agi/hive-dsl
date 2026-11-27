@@ -52,7 +52,23 @@ io.github.hive-agi/hive-dsl {:mvn/version "0.5.17"}
 
 ;; Selective catch, when you care WHAT failed
 (r/guard java.io.IOException nil (slurp path))
+
+;; Ordered per-class catch, Java's try with several catch clauses as one form.
+;; The first matching class wins, each handler sees the exception AND the
+;; original context, and the value is PLAIN -- never wrapped in a Result.
+(r/try-ordered ctx
+  [[java.io.FileNotFoundException (fn [e ctx] (assoc ctx :status 413))]
+   [java.io.IOException            (fn [e ctx] (assoc ctx :status 413))]
+   [clojure.lang.ExceptionInfo     (fn [e ctx] (assoc ctx :status 413))]
+   [:else                          (fn [e ctx] (assoc ctx :status 400))]]
+  (parse-multipart req))
 ```
+
+`try-ordered` refuses, at macro-expansion, a clause the JVM would never reach: a
+subclass listed after its superclass (the earlier catch already claims every
+instance), or any clause after `:else`. The shadowing rule is a compile error,
+not a silent dead branch. `:else` catches `Exception`, not `Error`, so a fatal
+`Error` still propagates; a throw inside a handler propagates too.
 
 `let-ok` is **strict**: a Result-bound right-hand side that evaluates to a
 non-Result throws with category `:result/non-result-binding`, naming the
